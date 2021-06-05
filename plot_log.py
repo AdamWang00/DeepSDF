@@ -15,7 +15,7 @@ def running_mean(x, N):
     return (cumsum[N:] - cumsum[:-N]) / float(N)
 
 
-def load_logs(experiment_directory, type):
+def load_logs(experiment_directory, type, is_color):
 
     logs = torch.load(os.path.join(experiment_directory, ws.logs_filename))
 
@@ -32,18 +32,36 @@ def load_logs(experiment_directory, type):
     fig, ax = plt.subplots()
 
     if type == "loss":
-
-        ax.plot(
-            np.arange(num_iters) / iters_per_epoch,
-            logs["loss"],
-            "#82c6eb",
-            np.arange(20, num_iters - 20) / iters_per_epoch,
-            smoothed_loss_41,
-            "#2a9edd",
-            np.arange(800, num_iters - 800) / iters_per_epoch,
-            smoothed_loss_1601,
-            "#16628b",
-        )
+        if is_color:
+            ax.plot(
+                np.arange(num_iters) / iters_per_epoch,
+                logs["loss"],
+                "#82c6eb",
+                np.arange(num_iters) / iters_per_epoch,
+                logs["sdf_loss"],
+                "#6759ff",
+                np.arange(num_iters) / iters_per_epoch,
+                logs["color_loss"],
+                "#ffaf59",
+                np.arange(20, num_iters - 20) / iters_per_epoch,
+                smoothed_loss_41,
+                "#2a9edd",
+                # np.arange(800, num_iters - 800) / iters_per_epoch,
+                # smoothed_loss_1601,
+                # "#16628b",
+            )
+        else:
+            ax.plot(
+                np.arange(num_iters) / iters_per_epoch,
+                logs["loss"],
+                "#82c6eb",
+                np.arange(20, num_iters - 20) / iters_per_epoch,
+                smoothed_loss_41,
+                "#2a9edd",
+                # np.arange(800, num_iters - 800) / iters_per_epoch,
+                # smoothed_loss_1601,
+                # "#16628b",
+            )
 
         ax.set(xlabel="Epoch", ylabel="Loss", title="Training Loss")
 
@@ -94,6 +112,7 @@ if __name__ == "__main__":
         + "as well",
     )
     arg_parser.add_argument("--type", "-t", dest="type", default="loss")
+    arg_parser.add_argument("--color", "-c", dest="is_color", default=False, action="store_true")
 
     deep_sdf.add_common_args(arg_parser)
 
@@ -101,4 +120,4 @@ if __name__ == "__main__":
 
     deep_sdf.configure_logging(args)
 
-    load_logs(args.experiment_directory, args.type)
+    load_logs(args.experiment_directory, args.type, args.is_color)

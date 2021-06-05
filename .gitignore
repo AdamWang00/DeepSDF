@@ -1,0 +1,13 @@
+__pycache__
+.vscode
+
+venv
+data
+experiments
+build
+bin
+
+cloud.ply
+material0.mtl
+material0.png
+temp.obj

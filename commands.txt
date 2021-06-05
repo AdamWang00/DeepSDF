@@ -1,0 +1,38 @@
+Preprocess
+    Training (SDF)
+        python preprocess_data.py --data_dir ./data --source ../data/3D-FUTURE-model/ --name 3D-FUTURE-model --split ./experiments/splits/new_chair.json --skip
+    Testing (SDF and surface)
+        python preprocess_data.py --data_dir ./data --source ../data/3D-FUTURE-model/ --name 3D-FUTURE-model --split ./experiments/splits/new_chair.json --test --skip
+        python preprocess_data.py --data_dir ./data --source ../data/3D-FUTURE-model/ --name 3D-FUTURE-model --split ./experiments/splits/new_chair.json --surface --skip
+
+Preprocess with Color
+    Training
+        python preprocess_data.py --data_dir ./data --source ../data/3D-FUTURE-model/ --name 3D-FUTURE-model --threads 12 --split ./fixed2.json
+        python preprocess_data.py --data_dir ./data --source ../data/3D-FUTURE-model/ --name 3D-FUTURE-model --threads 12 --surface --split ./fixed2.json
+    Add Color (to sdf and/or surface samples)
+        python preprocess_color.py --data_dir ./data --source ../data/3D-FUTURE-model/ --name 3D-FUTURE-model --split ./fixed2.json
+        python preprocess_color.py --data_dir ./data --source ../data/3D-FUTURE-model/ --name 3D-FUTURE-model --split ./fixed2.json --ignore_sdf --ignore_surface
+
+Train
+    New Training (color)
+        python train_deep_sdf_color.py -e experiments/chair --batch_split 1
+    Continue Training (color)
+        python train_deep_sdf_color.py -e experiments/chair -c latest --batch_split 1
+
+Plot Logs
+    Without sdf/color loss
+        python plot_log.py -e experiments/chair
+    With sdf/color loss
+        python plot_log.py -c -e experiments/chair
+
+Reconstruct
+    Training (color):
+        python generate_training_meshes_color.py -n -m 32 -c latest -e experiments/chair
+    Testing:
+        python reconstruct.py -e experiments/chair -c latest -d ./data --split ./experiments/splits/new_chair.json
+
+Evaluate
+    Training Reconstructions (color):
+        python evaluate_color.py -d ./data --split ./experiments/splits/new_chair.json -n -m 32 -c latest -e experiments/chair
+    Testing Reconstructions:
+        python evaluate.py -e experiments/chair -c latest -d ./data --split ./experiments/splits/new_chair.json

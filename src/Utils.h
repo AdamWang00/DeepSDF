@@ -60,9 +60,9 @@ Eigen::Vector3f SamplePointFromTriangle(
 
 std::pair<Eigen::Vector3f, float> ComputeNormalizationParameters(
     pangolin::Geometry& geom,
-    const float buffer = 1.03);
+    const float buffer = 1.00); // from 1.03
 
 float BoundingCubeNormalization(
     pangolin::Geometry& geom,
     const bool fitToUnitSphere,
-    const float buffer = 1.03);
+    const float buffer = 1.00); // from 1.03

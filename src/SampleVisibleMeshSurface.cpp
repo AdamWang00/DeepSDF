@@ -48,6 +48,21 @@ void SavePointsToPLY(const std::vector<Eigen::Vector3f>& verts, const std::strin
   plyFile.close();
 }
 
+void SaveVerticesToTXT(const std::vector<Eigen::Vector3f>& vertices, const std::string outputFile) {
+  const std::size_t num_vertices = vertices.size();
+  Eigen::Vector3f v;
+
+  std::ofstream txtFile;
+  txtFile.open(outputFile);
+
+  for (uint i = 0; i < num_vertices; i++) {
+    v = vertices[i];
+    txtFile << v[0] << " " << v[1] << " " << v[2] << "\n";
+  }
+
+  txtFile.close();
+}
+
 void SaveNormalizationParamsToNPZ(
     const Eigen::Vector3f offset,
     const float scale,
@@ -59,6 +74,7 @@ void SaveNormalizationParamsToNPZ(
 void SampleFromSurfaceInside(
     pangolin::Geometry& geom,
     std::vector<Eigen::Vector3f>& surfpts,
+    std::vector<Eigen::Vector3f>& surfptsFaceVertices,
     int num_sample,
     KdVertexListTree& kdTree,
     std::vector<Eigen::Vector3f>& surface_vertices,
@@ -138,20 +154,25 @@ void SampleFromSurfaceInside(
       continue;
 
     surfpts.push_back(point);
+    surfptsFaceVertices.push_back((Eigen::Vector3f)vertices.RowPtr(face(0)));
+    surfptsFaceVertices.push_back((Eigen::Vector3f)vertices.RowPtr(face(1)));
+    surfptsFaceVertices.push_back((Eigen::Vector3f)vertices.RowPtr(face(2)));
   }
 }
 
 int main(int argc, char** argv) {
   std::string meshFileName;
   std::string plyOutFile;
+  std::string facesOutFile;
   std::string normalizationOutputFile;
   int num_sample = 30000;
 
   CLI::App app{"SampleVisibleMeshSurface"};
   app.add_option("-m", meshFileName, "Mesh File Name for Reading")->required();
   app.add_option("-o", plyOutFile, "Save npy pc to here")->required();
+  app.add_option("-f", facesOutFile, "Save faces data for surface samples to here");
   app.add_option("-n", normalizationOutputFile, "Save normalization");
-  app.add_option("-s", num_sample, "Save ply pc to here");
+  app.add_option("-s", num_sample, "Number of surface samples");
 
   CLI11_PARSE(app, argc, argv);
 
@@ -308,8 +329,13 @@ int main(int argc, char** argv) {
   kdTree_surf.buildIndex();
 
   std::vector<Eigen::Vector3f> surf_pts;
-  SampleFromSurfaceInside(geom, surf_pts, num_sample, kdTree_surf, vertices2, normals2, 0.00001);
+  std::vector<Eigen::Vector3f> surf_pts_face_vertices;
+  SampleFromSurfaceInside(geom, surf_pts, surf_pts_face_vertices, num_sample, kdTree_surf, vertices2, normals2, 0.00001);
   SavePointsToPLY(surf_pts, plyOutFile);
+
+  if (!facesOutFile.empty()) {
+    SaveVerticesToTXT(surf_pts_face_vertices, facesOutFile);
+  }
 
   if (!normalizationOutputFile.empty()) {
     const std::pair<Eigen::Vector3f, float> normalizationParams =

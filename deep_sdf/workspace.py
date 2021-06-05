@@ -17,6 +17,7 @@ data_source_map_filename = ".datasources.json"
 evaluation_subdir = "Evaluation"
 sdf_samples_subdir = "SdfSamples"
 surface_samples_subdir = "SurfaceSamples"
+surface_sample_faces_subdir = "SurfaceSampleFaces"
 normalization_param_subdir = "NormalizationParameters"
 training_meshes_subdir = "TrainingMeshes"
 
@@ -125,6 +126,20 @@ def get_reconstructed_mesh_filename(
         reconstructions_subdir,
         str(epoch),
         reconstruction_meshes_subdir,
+        dataset,
+        class_name,
+        instance_name + ".ply",
+    )
+
+
+def get_reconstructed_training_mesh_filename(
+    experiment_dir, epoch, dataset, class_name, instance_name
+):
+
+    return os.path.join(
+        experiment_dir,
+        training_meshes_subdir,
+        str(epoch),
         dataset,
         class_name,
         instance_name + ".ply",

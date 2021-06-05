@@ -149,7 +149,10 @@ if __name__ == "__main__":
 
     deep_sdf.configure_logging(args)
 
-    additional_general_args = []
+    if args.surface_sampling:
+        additional_general_args = []
+    else:
+        additional_general_args = ["-b", "20.0"] # surface bias parameter (for importance sampling of SDF samples)
 
     deepsdf_dir = os.path.dirname(os.path.abspath(__file__))
     if args.surface_sampling:
@@ -183,6 +186,12 @@ if __name__ == "__main__":
         os.makedirs(dest_dir)
 
     if args.surface_sampling:
+        surface_sample_faces_dir = os.path.join(
+            args.data_dir, ws.surface_sample_faces_subdir, args.source_name
+        )
+        if not os.path.isdir(surface_sample_faces_dir):
+            os.makedirs(surface_sample_faces_dir)
+
         normalization_param_dir = os.path.join(
             args.data_dir, ws.normalization_param_subdir, args.source_name
         )
@@ -223,6 +232,17 @@ if __name__ == "__main__":
                 specific_args = []
 
                 if args.surface_sampling:
+                    surface_sample_faces_target_dir = os.path.join(
+                        surface_sample_faces_dir, class_dir
+                    )
+
+                    if not os.path.isdir(surface_sample_faces_target_dir):
+                        os.mkdir(surface_sample_faces_target_dir)
+
+                    surface_sample_faces_filename = os.path.join(
+                        surface_sample_faces_target_dir, instance_dir + ".txt"
+                    )
+
                     normalization_param_target_dir = os.path.join(
                         normalization_param_dir, class_dir
                     )
@@ -233,11 +253,12 @@ if __name__ == "__main__":
                     normalization_param_filename = os.path.join(
                         normalization_param_target_dir, instance_dir + ".npz"
                     )
-                    specific_args = ["-n", normalization_param_filename]
+
+                    specific_args = ["-f", surface_sample_faces_filename, "-n", normalization_param_filename]
 
                 meshes_targets_and_specific_args.append(
                     (
-                        os.path.join(shape_dir, mesh_filename),
+                        mesh_filename,
                         processed_filepath,
                         specific_args,
                     )

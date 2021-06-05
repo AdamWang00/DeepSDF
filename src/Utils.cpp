@@ -220,9 +220,10 @@ float BoundingCubeNormalization(
     // pass when it's not used.
     if (verticesUsed[i] == false)
       continue;
-    vertices(0, i) -= xCenter;
-    vertices(1, i) -= yCenter;
-    vertices(2, i) -= zCenter;
+    // removed re-centering for color preprocessing
+    // vertices(0, i) -= xCenter;
+    // vertices(1, i) -= yCenter;
+    // vertices(2, i) -= zCenter;
 
     const float dist = Eigen::Map<Eigen::Vector3f>(vertices.RowPtr(i)).norm();
     maxDistance = std::max(maxDistance, dist);
