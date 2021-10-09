@@ -152,7 +152,8 @@ if __name__ == "__main__":
     if args.surface_sampling:
         additional_general_args = []
     else:
-        additional_general_args = ["-b", "20.0"] # surface bias parameter (for importance sampling of SDF samples)
+        additional_general_args = []
+        # additional_general_args = ["-b", "20.0"] # surface bias parameter (for importance sampling of SDF samples)
 
     deepsdf_dir = os.path.dirname(os.path.abspath(__file__))
     if args.surface_sampling:

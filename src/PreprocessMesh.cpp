@@ -20,40 +20,115 @@
 
 extern pangolin::GlSlProgram GetShaderProgram();
 
-void SampleSDFNearSurface(
-    KdVertexListTree& kdTree,
-    std::vector<Eigen::Vector3f>& vertices,
-    std::vector<Eigen::Vector3f>& normals,
-    std::vector<Eigen::Vector3f>& xyz,
-    std::vector<float>& sdfs,
-    int num_samples,
-    float surface_bias,
-    float bounding_cube_dim,
-    int num_votes) {
-  float stdv = sqrt(0.005);
-  bounding_cube_dim *= 1.1;
+void SampleFromSurface(
+    pangolin::Geometry& geom,
+    std::vector<Eigen::Vector3f>& surfpts,
+    int num_sample) {
+  float total_area = 0.0f;
+
+  std::vector<float> cdf_by_area;
+
+  std::vector<Eigen::Vector3i> linearized_faces;
+
+  for (const auto& object : geom.objects) {
+    auto it_vert_indices = object.second.attributes.find("vertex_indices");
+    if (it_vert_indices != object.second.attributes.end()) {
+      pangolin::Image<uint32_t> ibo =
+          pangolin::get<pangolin::Image<uint32_t>>(it_vert_indices->second);
+
+      for (int i = 0; i < ibo.h; ++i) {
+        linearized_faces.emplace_back(ibo(0, i), ibo(1, i), ibo(2, i));
+      }
+    }
+  }
+
+  pangolin::Image<float> vertices =
+      pangolin::get<pangolin::Image<float>>(geom.buffers["geometry"].attributes["vertex"]);
+
+  for (const Eigen::Vector3i& face : linearized_faces) {
+    float area = TriangleArea(
+        (Eigen::Vector3f)Eigen::Map<Eigen::Vector3f>(vertices.RowPtr(face(0))),
+        (Eigen::Vector3f)Eigen::Map<Eigen::Vector3f>(vertices.RowPtr(face(1))),
+        (Eigen::Vector3f)Eigen::Map<Eigen::Vector3f>(vertices.RowPtr(face(2))));
+
+    if (std::isnan(area)) {
+      area = 0.f;
+    }
+
+    total_area += area;
+
+    if (cdf_by_area.empty()) {
+      cdf_by_area.push_back(area);
+
+    } else {
+      cdf_by_area.push_back(cdf_by_area.back() + area);
+    }
+  }
 
   std::random_device seeder;
   std::mt19937 generator(seeder());
-  std::uniform_real_distribution<float> rand_p(0.0, 1.0);
+  std::uniform_real_distribution<float> rand_dist(0.0, total_area);
 
+  while ((int)surfpts.size() < num_sample) {
+    float tri_sample = rand_dist(generator);
+    std::vector<float>::iterator tri_index_iter =
+        lower_bound(cdf_by_area.begin(), cdf_by_area.end(), tri_sample);
+    int tri_index = tri_index_iter - cdf_by_area.begin();
+
+    const Eigen::Vector3i& face = linearized_faces[tri_index];
+
+    surfpts.push_back(SamplePointFromTriangle(
+        Eigen::Map<Eigen::Vector3f>(vertices.RowPtr(face(0))),
+        Eigen::Map<Eigen::Vector3f>(vertices.RowPtr(face(1))),
+        Eigen::Map<Eigen::Vector3f>(vertices.RowPtr(face(2)))));
+  }
+}
+
+void SampleSDFNearSurface(
+    KdVertexListTree& kdTree,
+    std::vector<Eigen::Vector3f>& vertices,
+    std::vector<Eigen::Vector3f>& xyz_surf,
+    std::vector<Eigen::Vector3f>& normals,
+    std::vector<Eigen::Vector3f>& xyz,
+    std::vector<float>& sdfs,
+    int num_rand_samples,
+    float variance,
+    float second_variance,
+    float bounding_cube_dim,
+    int num_votes) {
+  float stdv = sqrt(variance);
+
+  std::random_device seeder;
+  std::mt19937 generator(seeder());
+  std::uniform_real_distribution<float> rand_dist(0.0, 1.0);
   std::vector<Eigen::Vector3f> xyz_used;
-  std::vector<Eigen::Vector3f> xyz_sampled;
-  std::vector<float> sdfs_sampled;
-  std::vector<float> xyz_importances;
-  float xyz_importances_total = 0.0;
+  std::vector<Eigen::Vector3f> second_samples;
 
   std::random_device rd;
   std::mt19937 rng(rd());
+  std::uniform_int_distribution<int> vert_ind(0, vertices.size() - 1);
+  std::normal_distribution<float> perterb_norm(0, stdv);
+  std::normal_distribution<float> perterb_second(0, sqrt(second_variance));
 
-  float interval = bounding_cube_dim / std::cbrt(num_samples * 10);
+  for (unsigned int i = 0; i < xyz_surf.size(); i++) {
+    Eigen::Vector3f surface_p = xyz_surf[i];
+    Eigen::Vector3f samp1 = surface_p;
+    Eigen::Vector3f samp2 = surface_p;
 
-  for (float x = -bounding_cube_dim/2; x < bounding_cube_dim/2; x += interval) {
-    for (float y = -bounding_cube_dim/2; y < bounding_cube_dim/2; y += interval) {
-      for (float z = -bounding_cube_dim/2; z < bounding_cube_dim/2; z += interval) {
-        xyz.push_back(Eigen::Vector3f(x, y, z));
-      }
+    for (int j = 0; j < 3; j++) {
+      samp1[j] += perterb_norm(rng);
+      samp2[j] += perterb_second(rng);
     }
+
+    xyz.push_back(samp1);
+    xyz.push_back(samp2);
+  }
+
+  for (int s = 0; s < (int)(num_rand_samples); s++) {
+    xyz.push_back(Eigen::Vector3f(
+        rand_dist(generator) * bounding_cube_dim - bounding_cube_dim / 2,
+        rand_dist(generator) * bounding_cube_dim - bounding_cube_dim / 2,
+        rand_dist(generator) * bounding_cube_dim - bounding_cube_dim / 2));
   }
 
   // now compute sdf for each xyz sample
@@ -88,11 +163,6 @@ void SampleSDFNearSurface(
     // all or nothing , else ignore the point
     if ((num_pos == 0) || (num_pos == num_votes)) {
       xyz_used.push_back(samp_vert);
-
-      float xyz_importance = exp(-surface_bias * sdf);
-      xyz_importances.push_back(xyz_importance);
-      xyz_importances_total += xyz_importance;
-
       if (num_pos <= (num_votes / 2)) {
         sdf = -sdf;
       }
@@ -100,27 +170,7 @@ void SampleSDFNearSurface(
     }
   }
 
-  // std::ofstream debugFile;
-  // debugFile.open("debug.txt");
-  // debugFile << "sdfs " << sdfs.size() << "\n";
-  // debugFile << "xyz_importances_total " << xyz_importances_total << "\n";
-  // debugFile << "num_samples " << num_samples << "\n";
-  // debugFile << "surface_bias " << surface_bias << "\n";
-  // debugFile.close();
-
-  // importance sampling
-  for (int s = 0; s < (int)xyz_used.size(); s++) {
-    Eigen::Vector3f samp_vert = xyz_used[s];
-    float samp_prob = xyz_importances[s] / xyz_importances_total * num_samples;
-
-    if (rand_p(generator) < samp_prob) {
-      xyz_sampled.push_back(samp_vert);
-      sdfs_sampled.push_back(sdfs[s]);
-    }
-  }
-
-  xyz = xyz_sampled;
-  sdfs = sdfs_sampled;
+  xyz = xyz_used;
 }
 
 void writeSDFToNPY(
@@ -238,11 +288,11 @@ int main(int argc, char** argv) {
   std::string spatial_samples_npz;
   bool save_ply = true;
   bool test_flag = false;
-
+  float variance = 0.005;
   int num_sample = 500000;
   float rejection_criteria_obs = 0.02f;
   float rejection_criteria_tri = 0.03f;
-  float surface_bias = 1.0f;
+  float num_samp_near_surf_ratio = 47.0f / 50.0f;
 
   CLI::App app{"PreprocessMesh"};
   app.add_option("-m", meshFileName, "Mesh File Name for Reading")->required();
@@ -250,14 +300,21 @@ int main(int argc, char** argv) {
   app.add_option("-o", npyFileName, "Save npy pc to here")->required();
   app.add_option("--ply", plyFileNameOut, "Save ply pc to here");
   app.add_option("-s", num_sample, "Number of sdf samples");
-  app.add_option("-b", surface_bias, "Set surface bias");
+  app.add_option("--var", variance, "Set Variance");
   app.add_flag("--sply", save_ply, "save ply point cloud for visualization");
   app.add_flag("-t", test_flag, "test_flag");
   app.add_option("-n", spatial_samples_npz, "spatial samples from file");
 
   CLI11_PARSE(app, argc, argv);
 
+  if (test_flag)
+    variance = 0.05;
+
+  float second_variance = variance / 10;
+  std::cout << "variance: " << variance << " second: " << second_variance << std::endl;
   if (test_flag) {
+    second_variance = variance / 100;
+    num_samp_near_surf_ratio = 45.0f / 50.0f;
     num_sample = 250000;
   }
 
@@ -468,17 +525,23 @@ int main(int argc, char** argv) {
   kdTree_surf.buildIndex();
 
   std::vector<Eigen::Vector3f> xyz;
+  std::vector<Eigen::Vector3f> xyz_surf;
   std::vector<float> sdf;
+  int num_samp_near_surf = (int)(47 * num_sample / 50);
+  std::cout << "num_samp_near_surf: " << num_samp_near_surf << std::endl;
+  SampleFromSurface(geom, xyz_surf, num_samp_near_surf / 2);
 
   auto start = std::chrono::high_resolution_clock::now();
   SampleSDFNearSurface(
       kdTree_surf,
       vertices2,
+      xyz_surf,
       normals2,
       xyz,
       sdf,
-      num_sample,
-      surface_bias,
+      num_sample - num_samp_near_surf,
+      variance,
+      second_variance,
       2,
       11);
 

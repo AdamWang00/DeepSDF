@@ -2,23 +2,21 @@ import json
 import os
 
 dataset_name = "3D-FUTURE-model"
-super_category = "Chair"
-split_category_name = "chair"
-split_size = -1
-
-directory = os.path.join('../data', dataset_name, split_category_name)
-model_names = next(os.walk(directory))[1]
+split_name = "lighting"
+category_dir_ids = [33, 34]
 
 split = {}
 split[dataset_name] = {}
-split[dataset_name][split_category_name] = []
 
-c = 0
-for model_name in model_names:
-    split[dataset_name][split_category_name].append(model_name)
-    c += 1
-    if c == split_size:
-        break
+for category_dir_id in category_dir_ids:
+    split_category_name = "category_" + str(category_dir_id)
+    category_dir = os.path.join('../data', dataset_name, split_category_name)
+    model_names = next(os.walk(category_dir))[1]
 
-with open('split.json', 'w') as outfile:
-    json.dump(split, outfile)
+    split[dataset_name][split_category_name] = []
+
+    for model_name in model_names:
+        split[dataset_name][split_category_name].append(model_name)
+
+    with open(f'./experiments/splits/{split_name}.json', 'w') as outfile:
+        json.dump(split, outfile)

@@ -3,6 +3,7 @@ __pycache__
 
 venv
 data
+old_data
 experiments
 build
 bin

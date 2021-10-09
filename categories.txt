@@ -1,0 +1,60 @@
+Cabinet and shelf (cabinet):
+{'id': 1, 'super-category': 'Cabinet/Shelf/Desk', 'category': 'Children Cabinet'}, 140, 312
+{'id': 3, 'super-category': 'Cabinet/Shelf/Desk', 'category': 'Bookcase / jewelry Armoire'}, 198, 551
+{'id': 4, 'super-category': 'Cabinet/Shelf/Desk', 'category': 'Wardrobe'}, 315, 4426
+{'id': 7, 'super-category': 'Cabinet/Shelf/Desk', 'category': 'Sideboard / Side Cabinet / Console Table'}, 458, 217
+{'id': 8, 'super-category': 'Cabinet/Shelf/Desk', 'category': 'Wine Cabinet'}, 114, 18
+{'id': 10, 'super-category': 'Cabinet/Shelf/Desk', 'category': 'Drawer Chest / Corner cabinet'}, 363, 472
+{'id': 11, 'super-category': 'Cabinet/Shelf/Desk', 'category': 'Shelf'}, 2, 235
+
+Small table (smallTable):
+{'id': 6, 'super-category': 'Cabinet/Shelf/Desk', 'category': 'Corner/Side Table'}, 542, 512
+{'id': 12, 'super-category': 'Cabinet/Shelf/Desk', 'category': 'Round End Table'}, 68, 50
+
+Large table (largeTable):
+{'id': 5, 'super-category': 'Cabinet/Shelf/Desk', 'category': 'Coffee Table'}, 684, 117
+{'id': 23, 'super-category': 'Table', 'category': 'Dressing Table'}, 97, 455
+{'id': 24, 'super-category': 'Table', 'category': 'Dining Table'}, 389, 38
+{'id': 25, 'super-category': 'Table', 'category': 'Desk'}, 126, 621
+
+Nightstand (nightstand):
+{'id': 2, 'super-category': 'Cabinet/Shelf/Desk', 'category': 'Nightstand'}, 405, 6811
+
+TV stand (tvStand):
+{'id': 9, 'super-category': 'Cabinet/Shelf/Desk', 'category': 'TV Stand'}, 347, 981
+
+Bed (bed):
+{'id': 13, 'super-category': 'Bed', 'category': 'King-size Bed'}, 440, 4235
+{'id': 14, 'super-category': 'Bed', 'category': 'Bunk Bed'}, 28, 62
+{'id': 15, 'super-category': 'Bed', 'category': 'Bed Frame'}, 185, 1
+{'id': 16, 'super-category': 'Bed', 'category': 'Single bed'}, 126, 553
+{'id': 17, 'super-category': 'Bed', 'category': 'Kids Bed'}, 71, 252
+
+Chair and small sofa (chair):
+{'id': 18, 'super-category': 'Chair', 'category': 'Dining Chair'}, 443, 433
+{'id': 19, 'super-category': 'Chair', 'category': 'Lounge Chair / Cafe Chair / Office Chair'}, 585, 472
+{'id': 20, 'super-category': 'Chair', 'category': 'Dressing Chair'}, 41, 175
+{'id': 21, 'super-category': 'Chair', 'category': 'Classic Chinese Chair'}, 16, 20
+{'id': 22, 'super-category': 'Chair', 'category': 'Barstool'}, 114, 14
+{'id': 27, 'super-category': 'Sofa', 'category': 'armchair'}, 651, 248
+{'id': 30, 'super-category': 'Sofa', 'category': 'Lazy Sofa'}, 79, 3
+
+Large sofa (largeSofa):
+{'id': 26, 'super-category': 'Sofa', 'category': 'Three-Seat / Multi-seat Sofa'}, 852, 52
+{'id': 28, 'super-category': 'Sofa', 'category': 'Loveseat Sofa'}, 472, 33
+{'id': 29, 'super-category': 'Sofa', 'category': 'L-shaped Sofa'}, 169, 0
+{'id': 31, 'super-category': 'Sofa', 'category': 'Chaise Longue Sofa'}, 16, 0
+
+Small stool (smallStool):
+{'id': 32, 'super-category': 'Pier/Stool', 'category': 'Footstool / Sofastool / Bed End Stool / Stool'}, 323, 329
+
+Lighting (lighting):
+{'id': 33, 'super-category': 'Lighting', 'category': 'Pendant Lamp'}, 701, 4034
+{'id': 34, 'super-category': 'Lighting', 'category': 'Ceiling Lamp'}, 268, 1815
+
+Other:
+脚凳/墩 (footstool/pier), 83
+衣帽架 (coat rack), 56
+博古架 ("bogu" frame), 13
+置物架 (shelf), 9
+装饰架 (decorative frame), 3
