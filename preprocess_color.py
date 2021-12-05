@@ -109,7 +109,10 @@ def preprocess_color(model_path, texture_path, surface_samples_path, surface_sam
                 points_indices_best = points_indices
                 loss_best = loss
         
-        samples_uv[i] = np.dot(b_coords_best, sample_triangles_uv[i][points_indices_best])
+        if b_coords_best is None:
+            samples_uv[i] = [0, 0]
+        else :
+            samples_uv[i] = np.dot(b_coords_best, sample_triangles_uv[i][points_indices_best])
 
     samples_color = uv_to_color(samples_uv, textures)[:, 0:3] # discard alpha
 
