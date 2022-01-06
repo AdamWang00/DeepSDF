@@ -1,6 +1,4 @@
 #!/usr/bin/env python3
-# Copyright 2004-present Facebook. All Rights Reserved.
-
 import torch.nn as nn
 import torch
 import torch.nn.functional as F
@@ -26,9 +24,6 @@ class Decoder(nn.Module):
         film_layers=() # >= 0 e.g. 4 = film output of 5th layer
     ):
         super(Decoder, self).__init__()
-
-        def make_sequence():
-            return []
 
         if use_fourier_features:
             xyz_size = fourier_features_size*2

@@ -1,6 +1,4 @@
 #!/usr/bin/env python3
-# Copyright 2004-present Facebook. All Rights Reserved.
-
 import torch.nn as nn
 import torch
 import torch.nn.functional as F
@@ -15,45 +13,11 @@ class FiLM(nn.Module):
         return self.relu((gammas * x) + betas)
 
 
-class FiLMedSIREN(nn.Module):
-    def __init__(self):
-        nn.Module.__init__(self)
-        self.film = FiLM()
-    def forward(self, x, gammas, betas):
-        return torch.sin(self.film(x, gammas, betas))
-
-
-# class MappingNetwork(nn.Module):
-#     def __init__(self, latent_len, num_filmed_layers, out_dim=512):
-#         nn.Module.__init__(self)
-#         self.fc1 = nn.Linear(latent_len, 256)
-#         self.fc2 = nn.Linear(256, 256)
-#         self.fc3 = nn.Linear(256, 256)
-#         self.fc4 = nn.Linear(256, num_filmed_layers * out_dim * 2) # need scales and shifts
-
-#         self.lrelu = nn.LeakyReLU(0.2)
-    
-#     def forward(self, latent):
-#         return self.fc4(self.lrelu(self.fc3(self.lrelu(self.fc2(self.lrelu(self.fc1(latent)))))))
-
-# class MappingNetwork(nn.Module):
-#     def __init__(self, latent_len, out_dim=256):
-#         nn.Module.__init__(self)
-#         self.fc1 = nn.Linear(latent_len, 256)
-#         self.fc2 = nn.Linear(256, 256)
-#         self.fc3 = nn.Linear(256, 256)
-#         self.fc4 = nn.Linear(256, out_dim * 2) # need scales and shifts
-
-#         self.lrelu = nn.LeakyReLU(0.2)
-    
-#     def forward(self, latent):
-#         return self.fc4(self.lrelu(self.fc3(self.lrelu(self.fc2(self.lrelu(self.fc1(latent)))))))
-
 class MappingNetwork(nn.Module):
     def __init__(self, latent_len, hidden_dims, out_dim=256):
         nn.Module.__init__(self)
 
-        dims = [latent_len] + hidden_dims + [out_dim * 2] # need scales and shifts
+        dims = [latent_len] + hidden_dims + [out_dim * 2] # out_dim scales and out_dim shifts
         self.num_layers = len(dims)
 
         for layer in range(0, self.num_layers - 1):
@@ -70,16 +34,10 @@ class MappingNetwork(nn.Module):
                 x = self.lrelu(x)
         return x
 
-# def gammas_betas(mapping_output, layer_index, out_dim=512):
-#     gammas = mapping_output[:, layer_index * out_dim : (layer_index + 1) * out_dim] + 1
-#     betas = mapping_output[:, layer_index * out_dim : (layer_index + 1) * out_dim]
-
-#     return gammas, betas
 
 def gammas_betas(mapping_output, out_dim=256):
     gammas = mapping_output[:, :out_dim] + 1
     betas = mapping_output[:, out_dim:]
-
     return gammas, betas
 
 
@@ -103,16 +61,11 @@ class Decoder(nn.Module):
         mapping_film_dims=[]
     ):
         super(Decoder, self).__init__()
-
-        def make_sequence():
-            return []
         
         self.use_film = use_film
         if self.use_film:
             self.film = FiLM()
-            # self.num_hidden_layers = len(dims)
             self.linear_dim = dims[0] # assume all hidden linear layers in decoder are the same dim
-            # self.mapping_film = MappingNetwork(latent_size, self.num_hidden_layers, out_dim=self.linear_dim)
             self.mapping_film_dims = mapping_film_dims
 
         if use_fourier_features:
@@ -196,9 +149,6 @@ class Decoder(nn.Module):
         else:
             x = xyz
 
-        # if self.use_film:
-        #     mapping_output = self.mapping_film(latent_vecs)
-
         for layer in range(0, self.num_layers - 1):
             lin = getattr(self, "lin" + str(layer))
             if layer > 0 and layer in self.latent_in:
@@ -221,7 +171,6 @@ class Decoder(nn.Module):
                 if self.use_film:
                     mn = getattr(self, "mn" + str(layer))
                     mapping_output = mn(latent_vecs)
-                    # gammas, betas = gammas_betas(mapping_output, layer, out_dim=self.linear_dim)
                     gammas, betas = gammas_betas(mapping_output, out_dim=self.linear_dim)
                     x = self.film(x, gammas, betas)
 
