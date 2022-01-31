@@ -9,7 +9,7 @@ ssd_data_path = "data"
 hdd_data_path = "/mnt/hdd1/awang_scene_synth/deepsdf/data"
 subdirs = ["SdfSamples", "SurfaceSampleFaces", "SurfaceSamples"]
 
-ssd_to_hdd = True # true = ssd->hdd, false = hdd->ssd
+ssd_to_hdd = False # true = ssd->hdd, false = hdd->ssd
 
 with open(split_path, 'rb') as f:
     split_json = json.load(f)

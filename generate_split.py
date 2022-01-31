@@ -1,9 +1,9 @@
 import json
 import os
 
-dataset_name = "3D-FUTURE-model"
-split_name = "lighting"
-category_dir_ids = [33, 34]
+dataset_name = "3D-FUTURE-model_2021"
+split_name = "chair2"
+category_dir_ids = [18, 19, 21, 22, 27, 30, 37]
 
 split = {}
 split[dataset_name] = {}

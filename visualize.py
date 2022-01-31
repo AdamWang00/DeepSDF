@@ -24,9 +24,9 @@ if __name__ == "__main__":
     split_path = "./experiments/splits/nightstand.json"
     split_name = "3D-FUTURE-model"
     split_category = "category_2"
-    experiment_names = ['nightstand1', 'nightstand1']
-    epochs = ['1000', '2000']
-    num_models = 8
+    experiment_names = ['nightstand1', 'nightstand_test5', 'nightstand_test6', 'nightstand_test7', 'nightstand_test8']
+    epochs = ['1000', '1000', '1000', '1000', '1000']
+    num_models = 16
     num_models_offset = 0
 
     scene = Scene()
@@ -43,8 +43,8 @@ if __name__ == "__main__":
             break
         num_models -= 1
 
-        gt_path = os.path.join('../data', split_name, split_category, model_id, 'normalized_model.obj')
-        gt_texture_path = os.path.join('../data', split_name, split_category, model_id, 'texture.png')
+        gt_path = os.path.join('../data', split_name+"_2021", split_category, model_id, 'normalized_model.obj')
+        gt_texture_path = os.path.join('../data', split_name+"_2021", split_category, model_id, 'texture.png')
         
         try:
             gt_mesh, gt_uv = get_trimesh_and_uv(trimesh.load(gt_path, process=False))

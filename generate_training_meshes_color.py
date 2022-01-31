@@ -28,7 +28,7 @@ def code_to_mesh(experiment_directory, checkpoint, max_meshes, keep_normalized=F
 
     decoder = arch.Decoder(latent_size, **specs["NetworkSpecs"])
 
-    decoder = torch.nn.DataParallel(decoder)
+    # decoder = torch.nn.DataParallel(decoder)
 
     saved_model_state = torch.load(
         os.path.join(experiment_directory, ws.model_params_subdir, checkpoint + ".pth")
@@ -37,7 +37,8 @@ def code_to_mesh(experiment_directory, checkpoint, max_meshes, keep_normalized=F
 
     decoder.load_state_dict(saved_model_state["model_state_dict"])
 
-    decoder = decoder.module.cuda()
+    # decoder = decoder.module.cuda()
+    decoder = decoder.cuda()
 
     decoder.eval()
 
@@ -93,7 +94,7 @@ def code_to_mesh(experiment_directory, checkpoint, max_meshes, keep_normalized=F
                 decoder,
                 latent_vector,
                 mesh_filename,
-                N=512,
+                N=256,
                 max_batch=int(2 ** 17),
                 offset=offset,
                 scale=scale,

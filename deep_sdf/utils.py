@@ -49,14 +49,18 @@ def configure_logging(args):
 
 
 def decode_sdf(decoder, latent_vector, queries):
-    num_samples = queries.shape[0]
+    # num_samples = queries.shape[0]
 
-    if latent_vector is None:
-        inputs = queries
-    else:
-        latent_repeat = latent_vector.expand(num_samples, -1)
-        inputs = torch.cat([latent_repeat.cuda(), queries], 1)
+    # if latent_vector is None:
+    #     inputs = queries
+    # else:
+    #     latent_repeat = latent_vector.expand(num_samples, -1)
+    #     inputs = torch.cat([latent_repeat.cuda(), queries], 1)
 
-    sdf = decoder(inputs)
+    # sdf = decoder(inputs)
+
+    # return sdf
+
+    sdf = decoder(queries, scene_latent=latent_vector.cuda())
 
     return sdf

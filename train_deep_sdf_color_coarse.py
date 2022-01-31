@@ -256,7 +256,7 @@ def append_parameter_magnitudes(param_mag_log, model):
         param_mag_log[name].append(param.data.norm().item())
 
 
-def main_function(experiment_directory, continue_from, batch_split):
+def main_function(experiment_directory, continue_from):
 
     logging.debug("running " + experiment_directory)
 
@@ -342,7 +342,7 @@ def main_function(experiment_directory, continue_from, batch_split):
     logging.info("training with {} GPU(s)".format(torch.cuda.device_count()))
 
     # if torch.cuda.device_count() > 1:
-    decoder = torch.nn.DataParallel(decoder)
+    # decoder = torch.nn.DataParallel(decoder)
 
     num_epochs = specs["NumEpochs"]
     log_frequency = get_spec_with_default(specs, "LogFrequency", 5)
@@ -474,6 +474,8 @@ def main_function(experiment_directory, continue_from, batch_split):
 
         for sdf_data, indices in sdf_loader: # sdf_data.shape is [ScenesPerBatch, SamplesPerScene, 7]
 
+            batch_split = scene_per_batch # we want to split the batch such that each mini batch = 1 scene (i.e. 1 latent code)
+
             # Process the input data
             sdf_data = sdf_data.reshape(-1, 7) # x, y, z, sdf_gt, r, g, b
 
@@ -489,11 +491,6 @@ def main_function(experiment_directory, continue_from, batch_split):
                 sdf_gt = torch.clamp(sdf_gt, minT, maxT)
 
             xyz = torch.chunk(xyz, batch_split)
-            indices = torch.chunk(
-                indices.unsqueeze(-1).repeat(1, num_samp_per_scene).view(-1),
-                batch_split,
-            )
-
             sdf_gt = torch.chunk(sdf_gt, batch_split)
             rgb_gt = torch.chunk(rgb_gt, batch_split)
 
@@ -505,11 +502,9 @@ def main_function(experiment_directory, continue_from, batch_split):
 
             for i in range(batch_split):
 
-                batch_vecs = lat_vecs(indices[i]) # uses (ScenesPerBatch / batch_split) different latent vectors
+                batch_vec = lat_vecs(indices[i]).cuda()
 
-                input = torch.cat([batch_vecs, xyz[i]], dim=1)
-
-                pred = decoder(input) # forward pass
+                pred = decoder(xyz[i].cuda(), scene_latent=batch_vec) # forward pass
                 pred_sdf = pred[:, 0]
                 pred_rgb = pred[:, 1:4]
 
@@ -532,7 +527,7 @@ def main_function(experiment_directory, continue_from, batch_split):
                 chunk_loss = loss_sdf + loss_rgb
 
                 if do_code_regularization:
-                    l2_size_loss = torch.sum(torch.norm(batch_vecs, dim=1))
+                    l2_size_loss = torch.sum(torch.norm(batch_vec, dim=0))
                     reg_loss = (
                         code_reg_lambda * min(1, epoch / 100) * l2_size_loss
                     ) / num_sdf_samples
@@ -612,15 +607,6 @@ if __name__ == "__main__":
         + "from the latest running snapshot, or an integer corresponding to "
         + "an epochal snapshot.",
     )
-    arg_parser.add_argument(
-        "--batch_split",
-        dest="batch_split",
-        default=1,
-        help="This splits the batch into separate subbatches which are "
-        + "processed separately, with gradients accumulated across all "
-        + "subbatches. This allows for training with large effective batch "
-        + "sizes in memory constrained environments.",
-    )
 
     deep_sdf.add_common_args(arg_parser)
 
@@ -628,4 +614,4 @@ if __name__ == "__main__":
 
     deep_sdf.configure_logging(args)
 
-    main_function(args.experiment_directory, args.continue_from, int(args.batch_split))
+    main_function(args.experiment_directory, args.continue_from)
