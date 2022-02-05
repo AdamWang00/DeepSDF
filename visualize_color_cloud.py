@@ -3,8 +3,8 @@ from trimesh.viewer import SceneViewer
 import numpy as np
 import matplotlib.pyplot as plt
 
-sdf_path = 'data/SdfSamples/3D-FUTURE-model_2021/category_18/0a4431a4-7214-32eb-88ff-6954da29a2da.npz'
-sdf_abs_threshold = 10
+sdf_path = 'data/SdfSamples/3D-FUTURE-model_2021/category_18/0a79b3eb-03c5-3df4-9a60-b4b99c443d87.npz'
+sdf_abs_threshold = 0.01
 
 sdf = np.load(sdf_path)
 sdf_pos = sdf["pos"]

@@ -142,7 +142,7 @@ if __name__ == "__main__":
 
     arg_parser = argparse.ArgumentParser(
         formatter_class=argparse.RawTextHelpFormatter,
-        description="Adds color to preprocessed information (after preprocess_data).",
+        description="Adds color to preprocessed data (after preprocess_data).",
     )
     arg_parser.add_argument(
         "--data_dir",

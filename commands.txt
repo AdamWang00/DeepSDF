@@ -1,10 +1,10 @@
 Preprocess with Color
     Training (note: Importance sampling may slow down preprocessing. This is enabled if the modified PreprocessMesh.cpp is built, and the '-b' flag is passed to the executable in preprocess_data.py.)
-        python preprocess_data.py --data_dir ./data --source ../data/3D-FUTURE-model_2021/ --name 3D-FUTURE-model_2021 --threads 12 --split ./experiments/splits/x.json
-        python preprocess_data.py --data_dir ./data --source ../data/3D-FUTURE-model_2021/ --name 3D-FUTURE-model_2021 --threads 12 --surface --split ./experiments/splits/x.json
+        python preprocess_data.py --data_dir ./data --source ../data/3D-FUTURE-model/ --name 3D-FUTURE-model --threads 12 --split ./experiments/splits/x.json
+        python preprocess_data.py --data_dir ./data --source ../data/3D-FUTURE-model/ --name 3D-FUTURE-model --threads 12 --surface --split ./experiments/splits/x.json
     Add Color (to sdf and/or surface samples)
-        python preprocess_color.py --data_dir ./data --source ../data/3D-FUTURE-model_2021/ --name 3D-FUTURE-model_2021 --split ./experiments/splits/x.json
-        python preprocess_color.py --data_dir ./data --source ../data/3D-FUTURE-model_2021/ --name 3D-FUTURE-model_2021 --split ./experiments/splits/x.json --ignore_sdf --ignore_surface
+        python preprocess_color.py --data_dir ./data --source ../data/3D-FUTURE-model/ --name 3D-FUTURE-model --split ./experiments/splits/x.json
+        python preprocess_color.py --data_dir ./data --source ../data/3D-FUTURE-model/ --name 3D-FUTURE-model --split ./experiments/splits/x.json --ignore_sdf --ignore_surface
 
 Train with Color
     New Training
