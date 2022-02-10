@@ -3,7 +3,7 @@ from trimesh.viewer import SceneViewer
 import numpy as np
 import matplotlib.pyplot as plt
 
-sdf_path = 'data/SdfSamples/3D-FUTURE-model_2021/category_18/0a79b3eb-03c5-3df4-9a60-b4b99c443d87.npz'
+sdf_path = 'data/SdfSamples/3D-FUTURE-model_manifold/category_2/aa4714b2-e1f4-40b9-b680-5ee2d82c920b.npz'
 sdf_abs_threshold = 0.01
 
 sdf = np.load(sdf_path)

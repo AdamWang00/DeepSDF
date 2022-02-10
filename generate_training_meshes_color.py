@@ -11,6 +11,9 @@ import deep_sdf
 import deep_sdf.workspace as ws
 
 
+BBOX_FACTOR = 1.1  # samples from BBOX_FACTOR times the bounding box size
+
+
 def code_to_mesh(experiment_directory, checkpoint, max_meshes, keep_normalized=False):
 
     specs_filename = os.path.join(experiment_directory, "specs.json")
@@ -31,7 +34,8 @@ def code_to_mesh(experiment_directory, checkpoint, max_meshes, keep_normalized=F
     # decoder = torch.nn.DataParallel(decoder)
 
     saved_model_state = torch.load(
-        os.path.join(experiment_directory, ws.model_params_subdir, checkpoint + ".pth")
+        os.path.join(experiment_directory,
+                     ws.model_params_subdir, checkpoint + ".pth")
     )
     saved_model_epoch = saved_model_state["epoch"]
 
@@ -51,7 +55,8 @@ def code_to_mesh(experiment_directory, checkpoint, max_meshes, keep_normalized=F
 
     data_source = specs["DataSource"]
 
-    instance_filenames = deep_sdf.data.get_instance_filenames(data_source, train_split)
+    instance_filenames = deep_sdf.data.get_instance_filenames(
+        data_source, train_split)
 
     print(len(instance_filenames), " vs ", len(latent_vectors))
 
@@ -59,10 +64,12 @@ def code_to_mesh(experiment_directory, checkpoint, max_meshes, keep_normalized=F
         if i == max_meshes:
             break
 
-        dataset_name, class_name, instance_name = instance_filenames[i].split("/")
+        dataset_name, class_name, instance_name = instance_filenames[i].split(
+            "/")
         instance_name = instance_name.split(".")[0]
 
-        print("{} {} {}".format(dataset_name, class_name, instance_name))
+        print("{}/{}: {} {} {}".format(i + 1, max_meshes,
+              dataset_name, class_name, instance_name))
 
         mesh_dir = os.path.join(
             experiment_directory,
@@ -98,6 +105,7 @@ def code_to_mesh(experiment_directory, checkpoint, max_meshes, keep_normalized=F
                 max_batch=int(2 ** 17),
                 offset=offset,
                 scale=scale,
+                bbox_factor=BBOX_FACTOR
             )
 
 
@@ -143,4 +151,5 @@ if __name__ == "__main__":
 
     deep_sdf.configure_logging(args)
 
-    code_to_mesh(args.experiment_directory, args.checkpoint, int(args.max_meshes), keep_normalized=args.keep_normalized)
+    code_to_mesh(args.experiment_directory, args.checkpoint, int(
+        args.max_meshes), keep_normalized=args.keep_normalized)

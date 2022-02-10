@@ -6,36 +6,38 @@ import torch
 import torch.nn.functional as F
 import numpy as np
 
-# pts (numpy array): [batch_size, 3] with 0 <= x, y, z <= 1 (i.e. in a unit box grid) to be interpolated (otherwise, if outside the unit box grid, extrapolated)
-# features (torch tensor): [batch_size, D, H, W, feature_len] with D, H, W >= 2
-# output: [batch_size, feature_len]
+
 def interpolate_trilinear(pts, features):
+    """
+    pts (numpy array): [batch_size, 3] with 0 <= x, y, z <= 1 (i.e. in a unit box grid) to be interpolated (otherwise, if outside the unit box grid, extrapolated)
+    features (torch tensor): [batch_size, D, H, W, feature_len] with D, H, W >= 2
+    output: [batch_size, feature_len]
+    """
     batch_size, depth, height, width, _ = features.shape
 
     # (i, j, k) are the indices of the (lower, bottom, down) feature, out of the 8 features we interpolate point between. (0, 0, 0) <= (i, j, k) <= (D - 2, H - 2, W - 2)
-    pts = np.copy(pts)
     pts[:, 0] *= depth - 1
     pts[:, 1] *= height - 1
     pts[:, 2] *= width - 1
-    ijk = pts.astype(np.int32)
-    i = np.clip(ijk[:, 0], 0, depth - 2, out=ijk[:, 0])
-    j = np.clip(ijk[:, 1], 0, height - 2, out=ijk[:, 1])
-    k = np.clip(ijk[:, 2], 0, width - 2, out=ijk[:, 2])
+    ijk = pts.long()
+    i = torch.clip(ijk[:, 0], 0, depth - 2, out=ijk[:, 0])
+    j = torch.clip(ijk[:, 1], 0, height - 2, out=ijk[:, 1])
+    k = torch.clip(ijk[:, 2], 0, width - 2, out=ijk[:, 2])
 
     # features at each of the 8 corners
     batch_indices = np.arange(batch_size)
-    f000 = features[batch_indices,  i   , j   ,  k   ]
-    f100 = features[batch_indices, (i+1), j   ,  k   ]
-    f010 = features[batch_indices,  i   ,(j+1),  k   ]
-    f001 = features[batch_indices,  i   , j   , (k+1)]
-    f101 = features[batch_indices, (i+1), j   , (k+1)]
-    f011 = features[batch_indices,  i   ,(j+1), (k+1)]
-    f110 = features[batch_indices, (i+1),(j+1),  k   ]
-    f111 = features[batch_indices, (i+1),(j+1), (k+1)]
+    f000 = features[batch_indices,  i, j,  k]
+    f100 = features[batch_indices, (i+1), j,  k]
+    f010 = features[batch_indices,  i, (j+1),  k]
+    f001 = features[batch_indices,  i, j, (k+1)]
+    f101 = features[batch_indices, (i+1), j, (k+1)]
+    f011 = features[batch_indices,  i, (j+1), (k+1)]
+    f110 = features[batch_indices, (i+1), (j+1),  k]
+    f111 = features[batch_indices, (i+1), (j+1), (k+1)]
 
     # (x, y, z) are the "sliders" for the three dimensions, with (0, 0, 0) being full weights for the (lower, bottom, down) feature and (1, 1, 1) being full weights for the (upper, top, up) feature
-    xyz = torch.Tensor(pts - ijk).cuda()
-    x, y, z = xyz[:,0], xyz[:,1], xyz[:,2]
+    xyz = (pts - ijk).cuda()
+    x, y, z = xyz[:, 0], xyz[:, 1], xyz[:, 2]
     fxyz = (f000.T * (1 - x)*(1 - y)*(1 - z)
             + f100.T * x * (1 - y) * (1 - z)
             + f010.T * (1 - x) * y * (1 - z)
@@ -47,35 +49,36 @@ def interpolate_trilinear(pts, features):
     return fxyz
 
 
-# pts (numpy array): [batch_size, 3] with 0 <= x, y, z <= 1 (i.e. in a unit box grid) to be interpolated (otherwise, if outside the unit box grid, extrapolated)
-# features (torch tensor): [D, H, W, feature_len] with D, H, W >= 2
-# output: [batch_size, feature_len]
 def interpolate_trilinear_alt(pts, features):
+    """
+    pts (numpy array): [batch_size, 3] with 0 <= x, y, z <= 1 (i.e. in a unit box grid) to be interpolated (otherwise, if outside the unit box grid, extrapolated)
+    features (torch tensor): [D, H, W, feature_len] with D, H, W >= 2
+    output: [batch_size, feature_len]
+    """
     depth, height, width, _ = features.shape
 
     # (i, j, k) are the indices of the (lower, bottom, down) feature, out of the 8 features we interpolate point between. (0, 0, 0) <= (i, j, k) <= (D - 2, H - 2, W - 2)
-    pts = np.copy(pts)
     pts[:, 0] *= depth - 1
     pts[:, 1] *= height - 1
     pts[:, 2] *= width - 1
-    ijk = pts.astype(np.int32)
-    i = np.clip(ijk[:, 0], 0, depth - 2, out=ijk[:, 0])
-    j = np.clip(ijk[:, 1], 0, height - 2, out=ijk[:, 1])
-    k = np.clip(ijk[:, 2], 0, width - 2, out=ijk[:, 2])
+    ijk = pts.long()
+    i = torch.clip(ijk[:, 0], 0, depth - 2, out=ijk[:, 0])
+    j = torch.clip(ijk[:, 1], 0, height - 2, out=ijk[:, 1])
+    k = torch.clip(ijk[:, 2], 0, width - 2, out=ijk[:, 2])
 
     # features at each of the 8 corners
-    f000 = features[i   , j   ,  k   ]
-    f100 = features[(i+1), j   ,  k   ]
-    f010 = features[ i   ,(j+1),  k   ]
-    f001 = features[ i   , j   , (k+1)]
-    f101 = features[(i+1), j   , (k+1)]
-    f011 = features[ i   ,(j+1), (k+1)]
-    f110 = features[(i+1),(j+1),  k   ]
-    f111 = features[(i+1),(j+1), (k+1)]
+    f000 = features[i, j,  k]
+    f100 = features[(i+1), j,  k]
+    f010 = features[i, (j+1),  k]
+    f001 = features[i, j, (k+1)]
+    f101 = features[(i+1), j, (k+1)]
+    f011 = features[i, (j+1), (k+1)]
+    f110 = features[(i+1), (j+1),  k]
+    f111 = features[(i+1), (j+1), (k+1)]
 
     # (x, y, z) are the "sliders" for the three dimensions, with (0, 0, 0) being full weights for the (lower, bottom, down) feature and (1, 1, 1) being full weights for the (upper, top, up) feature
-    xyz = torch.Tensor(pts - ijk).cuda()
-    x, y, z = xyz[:,0], xyz[:,1], xyz[:,2]
+    xyz = (pts - ijk).cuda()
+    x, y, z = xyz[:, 0], xyz[:, 1], xyz[:, 2]
     fxyz = (f000.T * (1 - x)*(1 - y)*(1 - z)
             + f100.T * x * (1 - y) * (1 - z)
             + f010.T * (1 - x) * y * (1 - z)
@@ -97,8 +100,8 @@ class Decoder(nn.Module):
         norm_layers=(),
         latent_in=(),
         weight_norm=False,
-        xyz_in_all=False, # disabled
-        use_tanh=False, # unused - last layer is always tanh
+        xyz_in_all=False,  # disabled
+        use_tanh=False,  # unused - last layer is always tanh
         latent_dropout=False,
         use_fourier_features=False,
         fourier_features_std=1.0,
@@ -116,7 +119,8 @@ class Decoder(nn.Module):
             in_channels = convt3d_dims[layer]
             out_channels = convt3d_dims[layer + 1]
             print("convT", layer, out_channels)
-            setattr(self, "convT" + str(layer), nn.ConvTranspose3d(in_channels, out_channels, convt3d_kernel_sizes[layer], convt3d_strides[layer]))
+            setattr(self, "convT" + str(layer), nn.ConvTranspose3d(in_channels,
+                    out_channels, convt3d_kernel_sizes[layer], convt3d_strides[layer]))
 
         if use_fourier_features:
             xyz_size = fourier_features_size*2
@@ -138,7 +142,8 @@ class Decoder(nn.Module):
         self.use_fourier_features = use_fourier_features
         if self.use_fourier_features:
             self.fourier_features_size = fourier_features_size
-            gaussian_matrix = torch.normal(0, fourier_features_std, size=(self.fourier_features_size, 3))
+            gaussian_matrix = torch.normal(
+                0, fourier_features_std, size=(self.fourier_features_size, 3))
             gaussian_matrix.requires_grad = False
             self.register_buffer('gaussian_matrix', gaussian_matrix)
 
@@ -158,7 +163,8 @@ class Decoder(nn.Module):
                     nn.utils.weight_norm(nn.Linear(dims[layer], out_dim)),
                 )
             else:
-                setattr(self, "lin" + str(layer), nn.Linear(dims[layer], out_dim))
+                setattr(self, "lin" + str(layer),
+                        nn.Linear(dims[layer], out_dim))
 
             if (
                 (not weight_norm)
@@ -185,31 +191,35 @@ class Decoder(nn.Module):
         xyz = input[:, -3:]
         latent_vecs = input[:, :-3]
 
-        latent_vecs = latent_vecs.view(latent_vecs.shape[0], latent_vecs.shape[1], 1, 1, 1)
+        latent_vecs = latent_vecs.view(
+            latent_vecs.shape[0], latent_vecs.shape[1], 1, 1, 1)
         for layer in range(self.conv3d_t_num_layers - 1):
             convT = getattr(self, "convT" + str(layer))
             latent_vecs = convT(latent_vecs)
             if (layer < self.conv3d_t_num_layers - 2):
                 latent_vecs = self.leaky(latent_vecs)
-        
-        latent_vecs = torch.permute(latent_vecs, (0, 2, 3, 4, 1)) # swaps feature (1) with DHW (2, 3, 4)
-        xyz_normalized = (xyz.cpu().detach().numpy() + 1) / 2 # should generally be 0 <= x,y,z <= 1
+
+        # swaps feature (1) with DHW (2, 3, 4)
+        latent_vecs = torch.permute(latent_vecs, (0, 2, 3, 4, 1))
+        xyz_normalized = (xyz + 1) / 2  # should generally be 0 <= x,y,z <= 1
         latent_vecs = interpolate_trilinear(xyz_normalized, latent_vecs)
 
         if self.use_fourier_features:
             xyz = (2.*np.pi*xyz) @ torch.t(self.gaussian_matrix).cuda()
             xyz = torch.cat((torch.sin(xyz), torch.cos(xyz)), -1)
-            
+
             input = torch.cat((latent_vecs, xyz), 1)
 
             if input.shape[1] > self.fourier_features_size*2 and self.latent_dropout:
-                latent_vecs = F.dropout(latent_vecs, p=0.2, training=self.training)
+                latent_vecs = F.dropout(
+                    latent_vecs, p=0.2, training=self.training)
                 x = torch.cat([latent_vecs, xyz], 1)
             else:
                 x = input
         else:
             if input.shape[1] > 3 and self.latent_dropout:
-                latent_vecs = F.dropout(latent_vecs, p=0.2, training=self.training)
+                latent_vecs = F.dropout(
+                    latent_vecs, p=0.2, training=self.training)
                 x = torch.cat([latent_vecs, xyz], 1)
             else:
                 x = input
@@ -234,18 +244,19 @@ class Decoder(nn.Module):
                     x = bn(x)
                 x = self.relu(x)
                 if self.dropout is not None and layer in self.dropout:
-                    x = F.dropout(x, p=self.dropout_prob, training=self.training)
+                    x = F.dropout(x, p=self.dropout_prob,
+                                  training=self.training)
 
         # if hasattr(self, "th"):
-        x[:, 0] = self.th(x[:, 0]) # only activate sdf value with tanh
+        x[:, 0] = self.th(x[:, 0])  # only activate sdf value with tanh
 
-        x[:, 1:4] = x[:, 1:4] * 255 # scale up (to avoid large parameters)
+        x[:, 1:4] = x[:, 1:4] * 255  # scale up (to avoid large parameters)
 
         return x
 
-
     # xyz: [N, 3]
     # latent_vecs: [L]
+
     def forward_alt(self, xyz, latent_vec):
         latent_vec = latent_vec.view(1, latent_vec.shape[0], 1, 1, 1)
         for layer in range(self.conv3d_t_num_layers - 1):
@@ -253,10 +264,10 @@ class Decoder(nn.Module):
             latent_vec = convT(latent_vec)
             if (layer < self.conv3d_t_num_layers - 2):
                 latent_vec = self.leaky(latent_vec)
-        
-        latent_vec = torch.permute(latent_vec[0], (1, 2, 3, 0)) # swaps feature (0) with DHW (1, 2, 3)
-        # print(latent_vec.shape)
-        xyz_normalized = (xyz.cpu().detach().numpy() + 1) / 2 # should generally be 0 <= x,y,z <= 1
+
+        # swaps feature (0) with DHW (1, 2, 3)
+        latent_vec = torch.permute(latent_vec[0], (1, 2, 3, 0))
+        xyz_normalized = (xyz + 1) / 2  # should generally be 0 <= x,y,z <= 1
         latent_vec = interpolate_trilinear_alt(xyz_normalized, latent_vec)
 
         if self.use_fourier_features:
@@ -265,7 +276,7 @@ class Decoder(nn.Module):
 
         if self.latent_dropout:
             latent_vec = F.dropout(latent_vec, p=0.2, training=self.training)
-        
+
         input = torch.cat([latent_vec, xyz], 1)
         x = input
 
@@ -289,11 +300,12 @@ class Decoder(nn.Module):
                     x = bn(x)
                 x = self.relu(x)
                 if self.dropout is not None and layer in self.dropout:
-                    x = F.dropout(x, p=self.dropout_prob, training=self.training)
+                    x = F.dropout(x, p=self.dropout_prob,
+                                  training=self.training)
 
         # if hasattr(self, "th"):
-        x[:, 0] = self.th(x[:, 0]) # only activate sdf value with tanh
+        x[:, 0] = self.th(x[:, 0])  # only activate sdf value with tanh
 
-        x[:, 1:4] = x[:, 1:4] * 255 # scale up (to avoid large parameters)
+        x[:, 1:4] = x[:, 1:4] * 255  # scale up (to avoid large parameters)
 
         return x

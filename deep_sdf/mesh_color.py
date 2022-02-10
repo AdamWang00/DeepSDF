@@ -12,7 +12,7 @@ import deep_sdf.utils
 
 
 def create_mesh(
-    decoder, latent_vec, filename, N=256, max_batch=32 ** 3, offset=None, scale=None
+    decoder, latent_vec, filename, N=256, max_batch=32 ** 3, offset=None, scale=None, bbox_factor=1.0
 ):
     start = time.time()
     ply_filename = filename
@@ -20,8 +20,8 @@ def create_mesh(
     decoder.eval()
 
     # NOTE: the voxel_origin is actually the (bottom, left, down) corner, not the middle
-    voxel_origin = [-1, -1, -1]
-    voxel_size = 2.0 / (N - 1)
+    voxel_origin = [-bbox_factor, -bbox_factor, -bbox_factor]
+    voxel_size = 2.0 * bbox_factor / (N - 1)
 
     overall_index = torch.arange(0, N ** 3, 1, out=torch.LongTensor())
     samples = torch.zeros(N ** 3, 4)
@@ -45,10 +45,12 @@ def create_mesh(
     head = 0
 
     while head < num_samples:
-        sample_subset = samples[head : min(head + max_batch, num_samples), 0:3].cuda()
+        sample_subset = samples[head: min(
+            head + max_batch, num_samples), 0:3].cuda()
 
-        samples[head : min(head + max_batch, num_samples), 3] = (
-            deep_sdf.utils.decode_sdf(decoder, latent_vec, sample_subset)[:, 0] # sdf
+        samples[head: min(head + max_batch, num_samples), 3] = (
+            deep_sdf.utils.decode_sdf(decoder, latent_vec, sample_subset)[
+                :, 0]  # sdf
             .detach()
             .cpu()
         )
@@ -121,12 +123,13 @@ def convert_sdf_samples_to_ply(
     head = 0
     num_points = mesh_point_colors.shape[0]
     while head < num_points:
-        mesh_point_colors[head : min(head + max_batch, num_points), :] = (
+        mesh_point_colors[head: min(head + max_batch, num_points), :] = (
             deep_sdf.utils.decode_sdf(
                 decoder,
                 latent_vec,
-                mesh_points_torch[head : min(head + max_batch, num_points), :].cuda()
-            )[:, 1:4] # r, g, b
+                mesh_points_torch[head: min(
+                    head + max_batch, num_points), :].cuda()
+            )[:, 1:4]  # r, g, b
             .detach()
             .cpu()
         )
@@ -139,7 +142,8 @@ def convert_sdf_samples_to_ply(
     num_verts = verts.shape[0]
     num_faces = faces.shape[0]
 
-    verts_tuple = np.zeros((num_verts,), dtype=[("x", "f4"), ("y", "f4"), ("z", "f4"), ('red', 'u1'), ('green', 'u1'), ('blue', 'u1')])
+    verts_tuple = np.zeros((num_verts,), dtype=[(
+        "x", "f4"), ("y", "f4"), ("z", "f4"), ('red', 'u1'), ('green', 'u1'), ('blue', 'u1')])
 
     for i in range(0, num_verts):
         verts_tuple[i] = (
@@ -154,7 +158,8 @@ def convert_sdf_samples_to_ply(
     faces_building = []
     for i in range(0, num_faces):
         faces_building.append(((faces[i, :].tolist(),)))
-    faces_tuple = np.array(faces_building, dtype=[("vertex_indices", "i4", (3,))])
+    faces_tuple = np.array(faces_building, dtype=[
+                           ("vertex_indices", "i4", (3,))])
 
     el_verts = plyfile.PlyElement.describe(verts_tuple, "vertex")
     el_faces = plyfile.PlyElement.describe(faces_tuple, "face")

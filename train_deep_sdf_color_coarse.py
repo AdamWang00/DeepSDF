@@ -76,7 +76,8 @@ def get_learning_rate_schedules(specs):
                 )
             )
         elif schedule_specs["Type"] == "Constant":
-            schedules.append(ConstantLearningRateSchedule(schedule_specs["Value"]))
+            schedules.append(ConstantLearningRateSchedule(
+                schedule_specs["Value"]))
 
         else:
             raise Exception(
@@ -100,7 +101,8 @@ def save_model(experiment_directory, filename, decoder, epoch):
 
 def save_optimizer(experiment_directory, filename, optimizer, epoch):
 
-    optimizer_params_dir = ws.get_optimizer_params_dir(experiment_directory, True)
+    optimizer_params_dir = ws.get_optimizer_params_dir(
+        experiment_directory, True)
 
     torch.save(
         {"epoch": epoch, "optimizer_state_dict": optimizer.state_dict()},
@@ -146,7 +148,8 @@ def load_latent_vectors(experiment_directory, filename, lat_vecs):
     )
 
     if not os.path.isfile(full_filename):
-        raise Exception('latent state file "{}" does not exist'.format(full_filename))
+        raise Exception(
+            'latent state file "{}" does not exist'.format(full_filename))
 
     data = torch.load(full_filename)
 
@@ -294,14 +297,18 @@ def main_function(experiment_directory, continue_from):
     def save_latest(epoch):
 
         save_model(experiment_directory, "latest.pth", decoder, epoch)
-        save_optimizer(experiment_directory, "latest.pth", optimizer_all, epoch)
-        save_latent_vectors(experiment_directory, "latest.pth", lat_vecs, epoch)
+        save_optimizer(experiment_directory,
+                       "latest.pth", optimizer_all, epoch)
+        save_latent_vectors(experiment_directory,
+                            "latest.pth", lat_vecs, epoch)
 
     def save_checkpoints(epoch):
 
         save_model(experiment_directory, str(epoch) + ".pth", decoder, epoch)
-        save_optimizer(experiment_directory, str(epoch) + ".pth", optimizer_all, epoch)
-        save_latent_vectors(experiment_directory, str(epoch) + ".pth", lat_vecs, epoch)
+        save_optimizer(experiment_directory, str(
+            epoch) + ".pth", optimizer_all, epoch)
+        save_latent_vectors(experiment_directory, str(
+            epoch) + ".pth", lat_vecs, epoch)
 
     def signal_handler(sig, frame):
         logging.info("Stopping early...")
@@ -329,12 +336,15 @@ def main_function(experiment_directory, continue_from):
     maxT = clamp_dist
     enforce_minmax = True
 
-    do_code_regularization = get_spec_with_default(specs, "CodeRegularization", True)
-    code_reg_lambda = get_spec_with_default(specs, "CodeRegularizationLambda", 1e-4)
+    do_code_regularization = get_spec_with_default(
+        specs, "CodeRegularization", True)
+    code_reg_lambda = get_spec_with_default(
+        specs, "CodeRegularizationLambda", 1e-4)
 
     code_bound = get_spec_with_default(specs, "CodeBound", None)
 
-    color_loss_sdf_threshold = get_spec_with_default(specs, "ColorLossSdfThreshold", 100.0)
+    color_loss_sdf_threshold = get_spec_with_default(
+        specs, "ColorLossSdfThreshold", 100.0)
     color_loss_weight = get_spec_with_default(specs, "ColorLossWeight", 0.0)
 
     decoder = arch.Decoder(latent_size, **specs["NetworkSpecs"]).cuda()
@@ -354,8 +364,10 @@ def main_function(experiment_directory, continue_from):
         data_source, train_split, num_samp_per_scene, load_ram=False
     )
 
-    num_data_loader_threads = get_spec_with_default(specs, "DataLoaderThreads", 1)
-    logging.debug("loading data with {} threads".format(num_data_loader_threads))
+    num_data_loader_threads = get_spec_with_default(
+        specs, "DataLoaderThreads", 1)
+    logging.debug("loading data with {} threads".format(
+        num_data_loader_threads))
 
     sdf_loader = data_utils.DataLoader(
         sdf_dataset,
@@ -377,7 +389,8 @@ def main_function(experiment_directory, continue_from):
     torch.nn.init.normal_(
         lat_vecs.weight.data,
         0.0,
-        get_spec_with_default(specs, "CodeInitStdDev", 1.0) / math.sqrt(latent_size),
+        get_spec_with_default(specs, "CodeInitStdDev",
+                              1.0) / math.sqrt(latent_size),
     )
 
     logging.debug(
@@ -472,19 +485,21 @@ def main_function(experiment_directory, continue_from):
 
         adjust_learning_rate(lr_schedules, optimizer_all, epoch)
 
-        for sdf_data, indices in sdf_loader: # sdf_data.shape is [ScenesPerBatch, SamplesPerScene, 7]
+        # sdf_data.shape is [ScenesPerBatch, SamplesPerScene, 7]
+        for sdf_data, indices in sdf_loader:
 
-            batch_split = scene_per_batch # we want to split the batch such that each mini batch = 1 scene (i.e. 1 latent code)
+            # we want to split the batch such that each mini batch = 1 scene (i.e. 1 latent code)
+            batch_split = scene_per_batch
 
             # Process the input data
-            sdf_data = sdf_data.reshape(-1, 7) # x, y, z, sdf_gt, r, g, b
+            sdf_data = sdf_data.reshape(-1, 7)  # x, y, z, sdf_gt, r, g, b
 
             num_sdf_samples = sdf_data.shape[0]
 
             sdf_data.requires_grad = False
 
             xyz = sdf_data[:, 0:3]
-            sdf_gt = sdf_data[:, 3].unsqueeze(1)
+            sdf_gt = sdf_data[:, 3]
             rgb_gt = sdf_data[:, 4:7]
 
             if enforce_minmax:
@@ -501,22 +516,23 @@ def main_function(experiment_directory, continue_from):
             optimizer_all.zero_grad()
 
             for i in range(batch_split):
-
                 batch_vec = lat_vecs(indices[i]).cuda()
 
-                pred = decoder(xyz[i].cuda(), scene_latent=batch_vec) # forward pass
+                # forward pass
+                pred = decoder(xyz[i].cuda(), scene_latent=batch_vec)
                 pred_sdf = pred[:, 0]
                 pred_rgb = pred[:, 1:4]
 
                 if enforce_minmax:
                     pred_sdf = torch.clamp(pred_sdf, minT, maxT)
-                
-                batch_sdf_gt = sdf_gt[i].squeeze().cuda()
+
+                batch_sdf_gt = sdf_gt[i].cuda()
                 batch_rgb_gt = rgb_gt[i].cuda()
 
                 # include color loss for points with |sdf_gt| < threshold
-                mask = torch.where(torch.abs(batch_sdf_gt) < color_loss_sdf_threshold, 1, 0).unsqueeze(1)
-                
+                mask = torch.where(torch.abs(batch_sdf_gt) <
+                                   color_loss_sdf_threshold, 1, 0).unsqueeze(1)
+
                 pred_rgb = torch.mul(pred_rgb, mask)
                 batch_rgb_gt = torch.mul(batch_rgb_gt, mask)
 
@@ -560,7 +576,8 @@ def main_function(experiment_directory, continue_from):
         print("time:", seconds_elapsed)
         timing_log.append(seconds_elapsed)
 
-        lr_log.append([schedule.get_learning_rate(epoch) for schedule in lr_schedules])
+        lr_log.append([schedule.get_learning_rate(epoch)
+                      for schedule in lr_schedules])
 
         lat_mag_log.append(get_mean_latent_vector_magnitude(lat_vecs))
 
@@ -589,7 +606,8 @@ if __name__ == "__main__":
 
     import argparse
 
-    arg_parser = argparse.ArgumentParser(description="Train a DeepSDF autodecoder")
+    arg_parser = argparse.ArgumentParser(
+        description="Train a DeepSDF autodecoder")
     arg_parser.add_argument(
         "--experiment",
         "-e",
