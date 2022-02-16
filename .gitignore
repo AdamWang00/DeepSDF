@@ -9,7 +9,6 @@ build
 bin
 scratch_work
 
-cloud.ply
-material0.mtl
-material0.png
-temp.obj
+*.ply
+*.obj
+*.png

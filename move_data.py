@@ -2,14 +2,14 @@ import os
 import shutil
 import json
 
-split_path = os.path.join("experiments", "splits", "nightstand.json")
+split_path = os.path.join("experiments", "splits", "largeSofa.json")
 split_name = "3D-FUTURE-model"
 
-ssd_data_path = "data"
-hdd_data_path = "/mnt/hdd1/awang_scene_synth/deepsdf/data"
+from_path = "data"
+to_path = "/mnt/hdd1/awang_scene_synth/deepsdf/data"
 subdirs = ["SdfSamples", "SurfaceSampleFaces", "SurfaceSamples"]
 
-ssd_to_hdd = False  # true = ssd->hdd, false = hdd->ssd
+direction_forward = True  # true = from->to, false = to->from
 
 with open(split_path, 'rb') as f:
     split_json = json.load(f)
@@ -19,14 +19,14 @@ confirm = input(f"move {categories} ? (y)")
 if (confirm == "y"):
     for category in categories:
         for subdir in subdirs:
-            if ssd_to_hdd:
+            if direction_forward:
                 path_from = os.path.join(
-                    ssd_data_path, subdir, split_name, category)
-                path_to = os.path.join(hdd_data_path, subdir, split_name)
+                    from_path, subdir, split_name, category)
+                path_to = os.path.join(to_path, subdir, split_name)
             else:
                 path_from = os.path.join(
-                    hdd_data_path, subdir, split_name, category)
-                path_to = os.path.join(ssd_data_path, subdir, split_name)
+                    to_path, subdir, split_name, category)
+                path_to = os.path.join(from_path, subdir, split_name)
             print(path_from, "==>", path_to)
             os.makedirs(path_to, exist_ok=True)
             if os.path.exists(path_from):

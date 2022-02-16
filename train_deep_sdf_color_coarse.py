@@ -259,7 +259,7 @@ def append_parameter_magnitudes(param_mag_log, model):
         param_mag_log[name].append(param.data.norm().item())
 
 
-def main_function(experiment_directory, continue_from):
+def main_function(experiment_directory, continue_from, load_ram):
 
     logging.debug("running " + experiment_directory)
 
@@ -361,7 +361,7 @@ def main_function(experiment_directory, continue_from):
         train_split = json.load(f)
 
     sdf_dataset = deep_sdf.data.SDFSamples(
-        data_source, train_split, num_samp_per_scene, load_ram=False
+        data_source, train_split, num_samp_per_scene, load_ram=load_ram
     )
 
     num_data_loader_threads = get_spec_with_default(
@@ -625,6 +625,14 @@ if __name__ == "__main__":
         + "from the latest running snapshot, or an integer corresponding to "
         + "an epochal snapshot.",
     )
+    arg_parser.add_argument(
+        "--loadram",
+        "-l",
+        dest="load_ram",
+        default=False,
+        action="store_true",
+        help="Store all data in RAM for performance.",
+    )
 
     deep_sdf.add_common_args(arg_parser)
 
@@ -632,4 +640,4 @@ if __name__ == "__main__":
 
     deep_sdf.configure_logging(args)
 
-    main_function(args.experiment_directory, args.continue_from)
+    main_function(args.experiment_directory, args.continue_from, args.load_ram)
