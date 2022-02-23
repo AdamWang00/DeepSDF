@@ -5,31 +5,14 @@ import os
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 
-
-def normalize(x, center, norm):
-    return (x - center) / norm
-
-
-save_to = "color_hist_largeSofa.png"
-split_path = "./experiments/splits/largeSofa.json"
+split_path = "./experiments/splits/bed.json"
 split_name = "3D-FUTURE-model"
 sdf_abs_threshold = 0.01
-measure_min_max = False
-
 
 with open(split_path, "r") as f:
     split = json.load(f)[split_name]
 
-if measure_min_max:
-    minL = 10000
-    maxL = -10000
-    minA = 10000
-    maxA = -10000
-    minB = 10000
-    maxB = -10000
-
-allA = []
-allB = []
+allRGB = []
 
 for category in split:
     i = 0
@@ -47,27 +30,40 @@ for category in split:
         sdf_all = np.concatenate((sdf_pos, sdf_neg), axis=0)
         sdf_all = sdf_all[np.abs(sdf_all[:, 3]) < sdf_abs_threshold, :]
 
-        rgb = sdf_all[:, 4:7] / 255
-        lab = color.rgb2lab(rgb)  # expects 0 <= rgb <= 1
+        rgb = sdf_all[:, 4:7]  # [0, 255]
+        allRGB.extend(rgb)
 
-        # lab[:, 0] = normalize(lab[:, 0], 50, 100)
-        # lab[:, 1] = normalize(lab[:, 1], 0, 110)
-        # lab[:, 2] = normalize(lab[:, 2], 0, 110)
+allRGB = np.array(allRGB)
 
-        if measure_min_max:
-            minL = min(minL, np.min(lab[:, 0]))
-            maxL = max(maxL, np.max(lab[:, 0]))
-            minA = min(minA, np.min(lab[:, 1]))
-            maxA = max(maxA, np.max(lab[:, 1]))
-            minB = min(minB, np.min(lab[:, 2]))
-            maxB = max(maxB, np.max(lab[:, 2]))
+allLAB = color.rgb2lab(allRGB / 255)  # input is [0.0, 1.0]
+allLAB[:, 0] = allLAB[:, 0] / 100  # [0.0, 1.0)
+allLAB[:, 1] = (allLAB[:, 1] + 100) / 200  # about (0.0, 1.0)
+allLAB[:, 2] = (allLAB[:, 2] + 100) / 200  # about (0.0, 1.0)
+allLAB = np.clip((allLAB * 8).astype(np.int), 0, 7)  # [0.0, 8.0) -> [0, 7]
 
-        allA.extend(lab[:, 1])
-        allB.extend(lab[:, 2])
+allRGB = allRGB / 256  # [0.0, 1.0)
+allRGB = np.clip((allRGB * 8).astype(np.int), 0, 7)  # [0.0, 8.0) -> [0, 7]
 
-if measure_min_max:
-    print(minL, maxL, minA, maxA, minB, maxB)
+for i in range(8):
+    slice_idx = allRGB[:, 0] == i
+    plt.clf()
+    plt.hist2d(allRGB[slice_idx, 1], allRGB[slice_idx, 2], bins=(
+        8, 8), range=((0, 8), (0, 8)), norm=mpl.colors.LogNorm())
+    plt.savefig(f"color_frequency_rgb{i}.png")
 
-plt.hist2d(allA, allB, bins=(60, 60), range=(
-    (-110, 110), (-110, 110)), norm=mpl.colors.LogNorm())
-plt.savefig(save_to)
+plt.clf()
+plt.hist2d(allRGB[:, 1], allRGB[:, 2], bins=(8, 8), range=(
+    (0, 8), (0, 8)), norm=mpl.colors.LogNorm())
+plt.savefig("color_frequency_rgb.png")
+
+for i in range(8):
+    slice_idx = allLAB[:, 0] == i
+    plt.clf()
+    plt.hist2d(allLAB[slice_idx, 1], allLAB[slice_idx, 2], bins=(
+        8, 8), range=((0, 8), (0, 8)), norm=mpl.colors.LogNorm())
+    plt.savefig(f"color_frequency_lab{i}.png")
+
+plt.clf()
+plt.hist2d(allLAB[:, 1], allLAB[:, 2], bins=(8, 8), range=(
+    (0, 8), (0, 8)), norm=mpl.colors.LogNorm())
+plt.savefig("color_frequency_lab.png")

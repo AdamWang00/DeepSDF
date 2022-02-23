@@ -5,6 +5,7 @@ from PIL import Image
 import json
 import os
 
+
 def get_trimesh_and_uv(scene_or_mesh):
     if isinstance(scene_or_mesh, trimesh.Scene):
         mesh = trimesh.util.concatenate(
@@ -20,14 +21,15 @@ def get_trimesh_and_uv(scene_or_mesh):
         uv = mesh.visual.uv
     return mesh, uv
 
+
 if __name__ == "__main__":
     split_path = "./experiments/splits/bed.json"
     split_name_gt = "3D-FUTURE-model"
-    split_category_gt = "category_13"
-    split_names = ['3D-FUTURE-model', '3D-FUTURE-model']
-    split_categories = ['category_13', 'category_13']
-    experiment_names = ['bed1', 'bed2']
-    epochs = ['1000', '1000']
+    # split_category_gt = "category_X"
+    # split_categories = ['category_X', 'category_X']
+    experiment_names = ['bed1', 'bed2b', 'bed2c']
+    epochs = ['1000', '1000', '1000']
+    split_names = ['3D-FUTURE-model'] * len(epochs)
     num_models = 16
     num_models_offset = 0
     color = True
@@ -36,7 +38,10 @@ if __name__ == "__main__":
     c = 0
 
     with open(split_path, "r") as f:
-        model_ids = json.load(f)[split_name_gt][split_category_gt]
+        split = model_ids = json.load(f)[split_name_gt]
+        split_category_gt = next(iter(split))
+        split_categories = [split_category_gt] * len(split_names)
+        model_ids = split[split_category_gt]
 
     for model_id in model_ids:
         if num_models_offset > 0:
@@ -46,21 +51,28 @@ if __name__ == "__main__":
             break
         num_models -= 1
 
-        gt_path = os.path.join('../data', split_name_gt, split_category_gt, model_id, 'normalized_model.obj')
-        gt_texture_path = os.path.join('../data', split_name_gt, split_category_gt, model_id, 'texture.png')
-        
+        gt_path = os.path.join(
+            '../data', split_name_gt, split_category_gt, model_id, 'normalized_model.obj')
+        gt_texture_path = os.path.join(
+            '../data', split_name_gt, split_category_gt, model_id, 'texture.png')
+
         try:
-            gt_mesh, gt_uv = get_trimesh_and_uv(trimesh.load(gt_path, process=False))
+            gt_mesh, gt_uv = get_trimesh_and_uv(
+                trimesh.load(gt_path, process=False))
             texture_im = Image.open(gt_texture_path)
-            gt_mesh.visual = trimesh.visual.texture.TextureVisuals(uv=gt_uv, image=texture_im).to_color()
-            scene.add_node(Node(mesh=Mesh.from_trimesh(gt_mesh), translation=[0, c*3, 0]))
+            gt_mesh.visual = trimesh.visual.texture.TextureVisuals(
+                uv=gt_uv, image=texture_im).to_color()
+            scene.add_node(Node(mesh=Mesh.from_trimesh(
+                gt_mesh), translation=[0, c*3, 0]))
             for index, (experiment_name, epoch, split_name, split_category) in enumerate(zip(experiment_names, epochs, split_names, split_categories)):
-                gen_path = os.path.join('./experiments', experiment_name, 'TrainingMeshes', epoch, split_name, split_category, model_id + '.ply')
+                gen_path = os.path.join('./experiments', experiment_name, 'TrainingMeshes',
+                                        epoch, split_name, split_category, model_id + '.ply')
                 gen_mesh = trimesh.load(gen_path, process=False)
                 assert gt_mesh.visual.kind == 'vertex'
                 if not color:
                     gen_mesh.visual.vertex_colors = (128, 128, 128, 255)
-                scene.add_node(Node(mesh=Mesh.from_trimesh(gen_mesh), translation=[2.5*(index+1), c*3, 0]))
+                scene.add_node(Node(mesh=Mesh.from_trimesh(
+                    gen_mesh), translation=[2.5*(index+1), c*3, 0]))
         except ValueError as e:
             print("[error]", str(e))
             continue

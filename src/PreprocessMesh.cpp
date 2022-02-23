@@ -160,8 +160,16 @@ void SampleSDFNearSurface(
         num_pos++;
     }
 
-    // all or nothing , else ignore the point
-    if ((num_pos == 0) || (num_pos == num_votes)) {
+    // // all or nothing , else ignore the point
+    // if ((num_pos == 0) || (num_pos == num_votes)) {
+    //   xyz_used.push_back(samp_vert);
+    //   if (num_pos <= (num_votes / 2)) {
+    //     sdf = -sdf;
+    //   }
+    //   sdfs.push_back(sdf);
+    // }
+    int leeway = 3;
+    if ((num_pos <= leeway) || (num_pos >= num_votes - leeway)) {
       xyz_used.push_back(samp_vert);
       if (num_pos <= (num_votes / 2)) {
         sdf = -sdf;
@@ -292,7 +300,7 @@ int main(int argc, char** argv) {
   int num_sample = 500000;
   float rejection_criteria_obs = 0.02f;
   float rejection_criteria_tri = 0.03f;
-  float num_samp_near_surf_ratio = 47.0f / 50.0f;
+  float num_samp_near_surf_ratio = 40.0f / 50.0f;
 
   CLI::App app{"PreprocessMesh"};
   app.add_option("-m", meshFileName, "Mesh File Name for Reading")->required();
@@ -527,7 +535,7 @@ int main(int argc, char** argv) {
   std::vector<Eigen::Vector3f> xyz;
   std::vector<Eigen::Vector3f> xyz_surf;
   std::vector<float> sdf;
-  int num_samp_near_surf = (int)(47 * num_sample / 50);
+  int num_samp_near_surf = (int)(num_samp_near_surf_ratio * num_sample);
   std::cout << "num_samp_near_surf: " << num_samp_near_surf << std::endl;
   SampleFromSurface(geom, xyz_surf, num_samp_near_surf / 2);
 

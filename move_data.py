@@ -2,12 +2,16 @@ import os
 import shutil
 import json
 
-split_path = os.path.join("experiments", "splits", "largeSofa.json")
+split_path = os.path.join("experiments", "splits", "tvStand.json")
 split_name = "3D-FUTURE-model"
 
 from_path = "data"
 to_path = "/mnt/hdd1/awang_scene_synth/deepsdf/data"
-subdirs = ["SdfSamples", "SurfaceSampleFaces", "SurfaceSamples"]
+subdirs = [
+    "SdfSamples",
+    # "SurfaceSampleFaces",
+    # "SurfaceSamples",
+]
 
 direction_forward = True  # true = from->to, false = to->from
 

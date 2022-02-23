@@ -5,6 +5,9 @@ Preprocess with Color
     Add Color (to sdf and/or surface samples)
         python preprocess_color.py --data_dir ./data --source ../data/3D-FUTURE-model/ --name 3D-FUTURE-model --split ./experiments/splits/x.json
         python preprocess_color.py --data_dir ./data --source ../data/3D-FUTURE-model/ --name 3D-FUTURE-model --split ./experiments/splits/x.json --ignore_sdf --ignore_surface
+    Add Color, Categorical
+        python preprocess_colorcat.py --data_dir ./data --source ../data/3D-FUTURE-model/ --name 3D-FUTURE-model --split ./experiments/splits/x.json
+        python preprocess_colorcat.py --data_dir ./data --source ../data/3D-FUTURE-model/ --name 3D-FUTURE-model --split ./experiments/splits/x.json --ignore_sdf --ignore_surface
 
 Train with Color
     New Training
@@ -28,6 +31,6 @@ Reconstruct
 
 Evaluate
     Training Reconstructions (color):
-        python evaluate_color.py -d ./data --split ./experiments/splits/new_chair.json -n -m 32 -c 1000 -e experiments/chair
+        python evaluate_color.py -d ./data -n -m 32 -c 1000 --split ./experiments/splits/new_chair.json -e experiments/chair
     Testing Reconstructions:
         python evaluate.py -e experiments/chair -c latest -d ./data --split ./experiments/splits/new_chair.json
