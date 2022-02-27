@@ -12,7 +12,8 @@ import deep_sdf.utils
 
 
 def create_mesh(
-    decoder, latent_vec, filename, N=256, max_batch=32 ** 3, offset=None, scale=None, bbox_factor=1.0
+    decoder, latent_vec, filename, N=256, max_batch=32 ** 3,
+    offset=None, scale=None, bbox_factor=1.0, is_colorcat=False
 ):
     start = time.time()
     ply_filename = filename
@@ -48,12 +49,20 @@ def create_mesh(
         sample_subset = samples[head: min(
             head + max_batch, num_samples), 0:3].cuda()
 
-        samples[head: min(head + max_batch, num_samples), 3] = (
-            deep_sdf.utils.decode_sdf(decoder, latent_vec, sample_subset)[
-                :, 0]  # sdf
-            .detach()
-            .cpu()
-        )
+        if is_colorcat:
+            samples[head: min(head + max_batch, num_samples), 3] = (
+                deep_sdf.utils.decode_sdf(decoder, latent_vec, sample_subset)[0]  # sdf
+                .detach()
+                .cpu()
+            )
+        else:
+            samples[head: min(head + max_batch, num_samples), 3] = (
+                deep_sdf.utils.decode_sdf(decoder, latent_vec, sample_subset)[
+                    :, 0]  # sdf
+                .detach()
+                .cpu()
+            )
+
         head += max_batch
 
     sdf_values = samples[:, 3]
@@ -69,8 +78,9 @@ def create_mesh(
         voxel_origin,
         voxel_size,
         ply_filename + ".ply",
-        offset,
-        scale,
+        offset=offset,
+        scale=scale,
+        is_colorcat=is_colorcat
     )
 
 
@@ -84,6 +94,7 @@ def convert_sdf_samples_to_ply(
     offset=None,
     scale=None,
     max_batch=32 ** 3,
+    is_colorcat=False
 ):
     """
     Convert sdf samples to .ply
@@ -120,19 +131,49 @@ def convert_sdf_samples_to_ply(
     mesh_point_colors = np.zeros_like(verts)
     mesh_points_torch = torch.from_numpy(mesh_points).float()
 
+    if is_colorcat:
+        annealing_temperature = 0.38
+
+        bin_to_rgb = np.zeros((512, 3))
+        range_512 = np.arange(512, dtype=int)
+
+        # e.g. [16, 48, ..., 240]
+        offset = 16
+        scale = 32
+
+        bin_to_rgb[:, 0] = offset + scale * np.mod(np.floor_divide(range_512, 8 * 8), 8) # r
+        bin_to_rgb[:, 1] = offset + scale * np.mod(np.floor_divide(range_512, 8), 8) # g
+        bin_to_rgb[:, 2] = offset + scale * np.mod(range_512, 8) # b
+
     head = 0
     num_points = mesh_point_colors.shape[0]
     while head < num_points:
-        mesh_point_colors[head: min(head + max_batch, num_points), :] = (
-            deep_sdf.utils.decode_sdf(
-                decoder,
-                latent_vec,
-                mesh_points_torch[head: min(
-                    head + max_batch, num_points), :].cuda()
-            )[:, 1:4]  # r, g, b
-            .detach()
-            .cpu()
-        )
+        if is_colorcat:
+            color_bins = (
+                deep_sdf.utils.decode_sdf(
+                    decoder,
+                    latent_vec,
+                    mesh_points_torch[head: min(
+                        head + max_batch, num_points), :].cuda()
+                )[1] # 512 bins
+                .detach()
+                .cpu()
+                .numpy()
+            )
+            annealed_color_bins = np.exp(np.log(color_bins) / annealing_temperature)
+            annealed_color_bins = np.divide(annealed_color_bins.T, np.sum(annealed_color_bins, axis=1)).T
+            mesh_point_colors[head: min(head + max_batch, num_points), :] = annealed_color_bins @ bin_to_rgb
+        else:
+            mesh_point_colors[head: min(head + max_batch, num_points), :] = (
+                deep_sdf.utils.decode_sdf(
+                    decoder,
+                    latent_vec,
+                    mesh_points_torch[head: min(
+                        head + max_batch, num_points), :].cuda()
+                )[:, 1:4]  # r, g, b
+                .detach()
+                .cpu()
+            )
         head += max_batch
 
     mesh_point_colors = np.clip(mesh_point_colors, 0, 255)

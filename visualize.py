@@ -23,13 +23,13 @@ def get_trimesh_and_uv(scene_or_mesh):
 
 
 if __name__ == "__main__":
-    split_path = "./experiments/splits/bed.json"
+    split_path = "./experiments/splits/nightstand.json"
     split_name_gt = "3D-FUTURE-model"
     # split_category_gt = "category_X"
     # split_categories = ['category_X', 'category_X']
-    experiment_names = ['bed1', 'bed2b', 'bed2c']
-    epochs = ['1000', '1000', '1000']
-    split_names = ['3D-FUTURE-model'] * len(epochs)
+    experiment_names = ['nightstand2', 'nightstand3c', 'nightstand3b']
+    epochs = ['1000'] * len(experiment_names)
+    split_names = ['3D-FUTURE-model', '3D-FUTURE-model', '3D-FUTURE-model']
     num_models = 16
     num_models_offset = 0
     color = True

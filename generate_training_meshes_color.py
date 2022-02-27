@@ -11,10 +11,10 @@ import deep_sdf
 import deep_sdf.workspace as ws
 
 
-BBOX_FACTOR = 1.1  # samples from BBOX_FACTOR times the bounding box size
+BBOX_FACTOR = 1.01  # samples from BBOX_FACTOR times the bounding box size
 
 
-def code_to_mesh(experiment_directory, checkpoint, max_meshes, keep_normalized=False):
+def code_to_mesh(experiment_directory, checkpoint, max_meshes, keep_normalized=False, is_colorcat=False):
 
     specs_filename = os.path.join(experiment_directory, "specs.json")
 
@@ -105,7 +105,8 @@ def code_to_mesh(experiment_directory, checkpoint, max_meshes, keep_normalized=F
                 max_batch=int(2 ** 17),
                 offset=offset,
                 scale=scale,
-                bbox_factor=BBOX_FACTOR
+                bbox_factor=BBOX_FACTOR,
+                is_colorcat=is_colorcat,
             )
 
 
@@ -145,11 +146,18 @@ if __name__ == "__main__":
         default=-1,
         help="The maximum number of meshes to generate, or -1 for no limit.",
     )
+    arg_parser.add_argument(
+        "--cat",
+        dest="is_colorcat",
+        default=False,
+        action="store_true",
+        help="Set to true for categorical color.",
+    )
     deep_sdf.add_common_args(arg_parser)
 
     args = arg_parser.parse_args()
 
     deep_sdf.configure_logging(args)
 
-    code_to_mesh(args.experiment_directory, args.checkpoint, int(
-        args.max_meshes), keep_normalized=args.keep_normalized)
+    code_to_mesh(args.experiment_directory, args.checkpoint, int(args.max_meshes),
+        keep_normalized=args.keep_normalized, is_colorcat=args.is_colorcat)

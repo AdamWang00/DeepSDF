@@ -12,7 +12,7 @@ import deep_sdf
 import deep_sdf.workspace as ws
 
 
-def evaluate(experiment_directory, checkpoint, data_dir, split_filename, max_meshes, keep_normalized=False):
+def evaluate(experiment_directory, checkpoint, data_dir, split_filename, max_meshes, keep_normalized=False, source_name_surface=None):
 
     with open(split_filename, "r") as f:
         split = json.load(f)
@@ -48,7 +48,7 @@ def evaluate(experiment_directory, checkpoint, data_dir, split_filename, max_mes
                 ground_truth_samples_filename = os.path.join(
                     data_dir,
                     "SurfaceSamples",
-                    dataset,
+                    source_name_surface if source_name_surface != None else dataset,
                     class_name,
                     instance_name + ".ply",
                 )
@@ -157,6 +157,13 @@ if __name__ == "__main__":
         default=-1,
         help="The maximum number of meshes to evaluate, or -1 for no limit.",
     )
+    arg_parser.add_argument(
+        "--name_surface",
+        dest="source_name_surface",
+        default=None,
+        help="The name to use for the data source. If unspecified, it defaults to the "
+        + "directory name.",
+    )
 
     deep_sdf.add_common_args(arg_parser)
 
@@ -170,5 +177,6 @@ if __name__ == "__main__":
         args.data_source,
         args.split_filename,
         int(args.max_meshes),
-        keep_normalized=args.keep_normalized
+        keep_normalized=args.keep_normalized,
+        source_name_surface=args.source_name_surface
     )

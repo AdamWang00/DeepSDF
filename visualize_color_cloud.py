@@ -5,8 +5,8 @@ import matplotlib.pyplot as plt
 
 save_to = 'cloud.ply'
 save_to_hist = 'cloud_hist.png'
-sdf_path = 'data/SdfSamples/3D-FUTURE-model/category_13/7d0a3b31-7d66-4d09-9761-647938bf43a6.npz'
-sdf_abs_threshold = 0.01
+sdf_path = 'data/SdfSamples/3D-FUTURE-model_manifold/category_13/6e1223c3-1e6b-4c9e-82d2-9e643d9e344b.npz'
+sdf_abs_threshold = 2
 
 sdf = np.load(sdf_path)
 sdf_pos = sdf["pos"]

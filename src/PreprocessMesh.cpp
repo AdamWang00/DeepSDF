@@ -16,11 +16,13 @@
 #include <CLI/CLI.hpp>
 #include <cnpy.h>
 
+#include <igl/fast_winding_number.h>
+
 #include "Utils.h"
 
 extern pangolin::GlSlProgram GetShaderProgram();
 
-void SampleFromSurface(
+std::vector<Eigen::Vector3i> SampleFromSurface(
     pangolin::Geometry& geom,
     std::vector<Eigen::Vector3f>& surfpts,
     int num_sample) {
@@ -82,11 +84,14 @@ void SampleFromSurface(
         Eigen::Map<Eigen::Vector3f>(vertices.RowPtr(face(1))),
         Eigen::Map<Eigen::Vector3f>(vertices.RowPtr(face(2)))));
   }
+
+  return linearized_faces;
 }
 
 void SampleSDFNearSurface(
     KdVertexListTree& kdTree,
     std::vector<Eigen::Vector3f>& vertices,
+    std::vector<Eigen::Vector3i>& faces,
     std::vector<Eigen::Vector3f>& xyz_surf,
     std::vector<Eigen::Vector3f>& normals,
     std::vector<Eigen::Vector3f>& xyz,
@@ -141,24 +146,24 @@ void SampleSDFNearSurface(
     int num_pos = 0;
     float sdf;
 
-    for (int ind = 0; ind < num_votes; ind++) {
-      uint32_t cl_ind = cl_indices[ind];
-      Eigen::Vector3f cl_vert = vertices[cl_ind];
-      Eigen::Vector3f ray_vec = samp_vert - cl_vert;
-      float ray_vec_leng = ray_vec.norm();
+    // for (int ind = 0; ind < num_votes; ind++) {
+    //   uint32_t cl_ind = cl_indices[ind];
+    //   Eigen::Vector3f cl_vert = vertices[cl_ind];
+    //   Eigen::Vector3f ray_vec = samp_vert - cl_vert;
+    //   float ray_vec_leng = ray_vec.norm();
 
-      if (ind == 0) {
-        // if close to the surface, use point plane distance
-        if (ray_vec_leng < stdv)
-          sdf = fabs(normals[cl_ind].dot(ray_vec));
-        else
-          sdf = ray_vec_leng;
-      }
+    //   if (ind == 0) {
+    //     // if close to the surface, use point plane distance
+    //     if (ray_vec_leng < stdv)
+    //       sdf = fabs(normals[cl_ind].dot(ray_vec));
+    //     else
+    //       sdf = ray_vec_leng;
+    //   }
 
-      float d = normals[cl_ind].dot(ray_vec / ray_vec_leng);
-      if (d > 0)
-        num_pos++;
-    }
+    //   float d = normals[cl_ind].dot(ray_vec / ray_vec_leng);
+    //   if (d > 0)
+    //     num_pos++;
+    // }
 
     // // all or nothing , else ignore the point
     // if ((num_pos == 0) || (num_pos == num_votes)) {
@@ -168,13 +173,45 @@ void SampleSDFNearSurface(
     //   }
     //   sdfs.push_back(sdf);
     // }
-    int leeway = 3;
-    if ((num_pos <= leeway) || (num_pos >= num_votes - leeway)) {
-      xyz_used.push_back(samp_vert);
-      if (num_pos <= (num_votes / 2)) {
-        sdf = -sdf;
-      }
-      sdfs.push_back(sdf);
+
+    // int leeway = 3;
+    // if ((num_pos <= leeway) || (num_pos >= num_votes - leeway)) {
+    //   xyz_used.push_back(samp_vert);
+    //   if (num_pos <= (num_votes / 2)) {
+    //     sdf = -sdf;
+    //   }
+    //   sdfs.push_back(sdf);
+    // }
+
+    // use all xyz/sdf
+    xyz_used.push_back(samp_vert);
+    sdfs.push_back(sdf);
+  }
+
+  // use winding number to determine sdf sign (+/-)
+  Eigen::MatrixXf V;
+  for (int i = 0; i < vertices.size(); i++) {
+    V.row(i) = vertices[i];
+  }
+  Eigen::MatrixXi F;
+  for (int i = 0; i < faces.size(); i++) {
+    F.row(i) = faces[i];
+  }
+
+  igl::FastWindingNumberBVH fwn_bvh;
+  igl::fast_winding_number(V.cast<float>(), F, 2, fwn_bvh);
+
+  Eigen::MatrixXf Q;
+  for (int i = 0; i < xyz_used.size(); i++) {
+    Q.row(i) = xyz_used[i];
+  }
+
+  Eigen::VectorXf W;
+  igl::fast_winding_number(fwn_bvh, 2, Q.cast<float>(), W);
+
+  for (int i = 0; i < W.size(); i++) {
+    if (W[i] > 0.5) { // a winding number > 0.5 means likely inside mesh
+      xyz_used[i] = -xyz_used[i];
     }
   }
 
@@ -300,7 +337,7 @@ int main(int argc, char** argv) {
   int num_sample = 500000;
   float rejection_criteria_obs = 0.02f;
   float rejection_criteria_tri = 0.03f;
-  float num_samp_near_surf_ratio = 40.0f / 50.0f;
+  float num_samp_near_surf_ratio = 47.0f / 50.0f;
 
   CLI::App app{"PreprocessMesh"};
   app.add_option("-m", meshFileName, "Mesh File Name for Reading")->required();
@@ -537,12 +574,14 @@ int main(int argc, char** argv) {
   std::vector<float> sdf;
   int num_samp_near_surf = (int)(num_samp_near_surf_ratio * num_sample);
   std::cout << "num_samp_near_surf: " << num_samp_near_surf << std::endl;
-  SampleFromSurface(geom, xyz_surf, num_samp_near_surf / 2);
+  
+  std::vector<Eigen::Vector3i> faces = SampleFromSurface(geom, xyz_surf, num_samp_near_surf / 2);
 
   auto start = std::chrono::high_resolution_clock::now();
   SampleSDFNearSurface(
       kdTree_surf,
       vertices2,
+      faces,
       xyz_surf,
       normals2,
       xyz,

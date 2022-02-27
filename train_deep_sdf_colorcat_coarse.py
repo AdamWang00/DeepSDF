@@ -481,19 +481,6 @@ def main_function(experiment_directory, continue_from, load_ram):
         )
     )
 
-    rgb_bin_proportions = torch.zeros((512))
-    for sdf_data, indices in sdf_loader:
-        rgb_idx = sdf_data.reshape(-1, 7)[:, 4:7]
-        rgb_bin_idx = rgb_to_bin(rgb_idx[:, 0], rgb_idx[:, 1], rgb_idx[:, 2]).long()
-        rgb_bin_proportions += torch.sum(rgb_bin_idx, 0) # sum of each 512 across samples
-
-    rgb_bin_proportions /= torch.sum(rgb_bin_proportions)
-
-    rgb_bin_weights = 1 / (0.5 * rgb_bin_proportions + (0.5 / 512))
-    rgb_bin_weights /= torch.dot(rgb_bin_proportions, rgb_bin_weights)
-    rgb_bin_weights = rgb_bin_weights.cuda()
-    rgb_bin_weights.requires_grad = False
-
     dirs3d = [
         [1, 0, 0],
         [-1, 0, 0],
@@ -502,6 +489,29 @@ def main_function(experiment_directory, continue_from, load_ram):
         [0, 0, 1],
         [0, 0, -1]
     ]
+
+    rgb_bin_proportions = torch.zeros((512))
+    for sdf_data, indices in sdf_loader:
+        rgb_idx = sdf_data.reshape(-1, 7)[:, 4:7]
+        rgb_bin_idx = rgb_to_bin(rgb_idx[:, 0], rgb_idx[:, 1], rgb_idx[:, 2]).long()
+        rgb_bin_proportions += 0.7 * torch.bincount(rgb_bin_idx, minlength=512)
+
+        for direction in dirs3d:
+            neighbor_bin_idx = rgb_to_bin(
+                torch.clip(rgb_idx[:, 0] + direction[0], 0, 7),
+                torch.clip(rgb_idx[:, 1] + direction[1], 0, 7),
+                torch.clip(rgb_idx[:, 2] + direction[2], 0, 7)
+            ).long()
+            rgb_bin_proportions += 0.05 * torch.bincount(neighbor_bin_idx, minlength=512)
+
+    rgb_bin_proportions /= torch.sum(rgb_bin_proportions)
+    assert abs(torch.sum(rgb_bin_proportions) - 1) < 1e-5
+
+    rgb_bin_weights = 1 / (0.5 * rgb_bin_proportions + (0.5 / 512))
+    rgb_bin_weights /= torch.dot(rgb_bin_proportions, rgb_bin_weights)
+    assert abs(torch.dot(rgb_bin_proportions, rgb_bin_weights) - 1) < 1e-5
+    rgb_bin_weights = rgb_bin_weights.cuda()
+    rgb_bin_weights.requires_grad = False
 
     for epoch in range(start_epoch, num_epochs + 1):
 
@@ -579,7 +589,22 @@ def main_function(experiment_directory, continue_from, load_ram):
 
                 batch_rgb_bin_gt = torch.mul(batch_rgb_bin_gt, mask)
 
+                # if i == 0:
+                    # print(torch.min(pred_rgb_bins).item(), torch.max(pred_rgb_bins).item(), torch.min(torch.log(pred_rgb_bins)).item(), torch.max(torch.log(pred_rgb_bins)).item())
+                    # nonzero = torch.nonzero(batch_rgb_bin_gt)
+                    # n0, n1 = nonzero[0:10, 0], nonzero[0:10, 1]
+                    # print("a", batch_rgb_bin_gt.shape)
+                    # print("b", torch.log(pred_rgb_bins).shape)
+                    # print("c", torch.mul(batch_rgb_bin_gt, torch.log(pred_rgb_bins)).shape)
+                    # print("d", torch.sum(torch.mul(batch_rgb_bin_gt, torch.log(pred_rgb_bins)), 1).shape)
+                    # print("e", torch.mul(rgb_bin_weights[batch_rgb_bin_idx_gt],
+                    #     torch.sum(torch.mul(batch_rgb_bin_gt, torch.log(pred_rgb_bins)), 1)).shape)
+                    # print("f", torch.sum(torch.mul(rgb_bin_weights[batch_rgb_bin_idx_gt],
+                    #     torch.sum(torch.mul(batch_rgb_bin_gt, torch.log(pred_rgb_bins)), 1))).shape)
+
                 loss_sdf = loss_l1(pred_sdf, batch_sdf_gt) / num_sdf_samples
+
+                pred_rgb_bins = torch.clamp(pred_rgb_bins, min=1e-30) # ensure pred_rgb_bins>0 to avoid div0
                 loss_rgb = -torch.sum(torch.mul(rgb_bin_weights[batch_rgb_bin_idx_gt],
                     torch.sum(torch.mul(batch_rgb_bin_gt, torch.log(pred_rgb_bins)), 1))) / num_sdf_samples
                 loss_rgb *= color_loss_weight

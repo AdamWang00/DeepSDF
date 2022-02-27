@@ -13,9 +13,11 @@ Train with Color
     New Training
         python train_deep_sdf_color.py -e experiments/chair --batch_split 1
         python train_deep_sdf_color_coarse.py -e experiments/chair
+        python train_deep_sdf_colorcat_coarse.py -e experiments/chair
     Continue Training
         python train_deep_sdf_color.py -e experiments/chair -c latest --batch_split 1
         python train_deep_sdf_color_coarse.py -e experiments/chair -c latest
+        python train_deep_sdf_colorcat_coarse.py -e experiments/chair -c latest
 
 Plot Logs
     Without sdf/color loss
@@ -26,6 +28,7 @@ Plot Logs
 Reconstruct
     Training (color):
         python generate_training_meshes_color.py -n -m 32 -c latest -e experiments/chair
+        python generate_training_meshes_color.py --cat -n -m 32 -c latest -e experiments/chair
     Testing:
         python reconstruct.py -e experiments/chair -c latest -d ./data --split ./experiments/splits/new_chair.json
 

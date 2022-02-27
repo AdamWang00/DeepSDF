@@ -502,6 +502,9 @@ def main_function(experiment_directory, continue_from, load_ram):
             sdf_gt = sdf_data[:, 3]
             rgb_gt = sdf_data[:, 4:7]
 
+            if xyz.dtype == torch.float64:
+                xyz = xyz.float()
+
             if enforce_minmax:
                 sdf_gt = torch.clamp(sdf_gt, minT, maxT)
 
