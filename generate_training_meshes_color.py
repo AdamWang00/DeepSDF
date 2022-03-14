@@ -12,6 +12,8 @@ import deep_sdf.workspace as ws
 
 
 BBOX_FACTOR = 1.01  # samples from BBOX_FACTOR times the bounding box size
+LEVEL_SET = 0.0 # SDF value used to determine surface level set
+SAMPLING_DIM = 256
 
 
 def code_to_mesh(experiment_directory, checkpoint, max_meshes, keep_normalized=False, is_colorcat=False):
@@ -101,12 +103,13 @@ def code_to_mesh(experiment_directory, checkpoint, max_meshes, keep_normalized=F
                 decoder,
                 latent_vector,
                 mesh_filename,
-                N=256,
+                N=SAMPLING_DIM,
                 max_batch=int(2 ** 17),
                 offset=offset,
                 scale=scale,
                 bbox_factor=BBOX_FACTOR,
                 is_colorcat=is_colorcat,
+                level_set=LEVEL_SET
             )
 
 

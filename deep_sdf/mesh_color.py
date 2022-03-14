@@ -13,7 +13,7 @@ import deep_sdf.utils
 
 def create_mesh(
     decoder, latent_vec, filename, N=256, max_batch=32 ** 3,
-    offset=None, scale=None, bbox_factor=1.0, is_colorcat=False
+    offset=None, scale=None, bbox_factor=1.0, is_colorcat=False, level_set=0.0
 ):
     start = time.time()
     ply_filename = filename
@@ -80,7 +80,8 @@ def create_mesh(
         ply_filename + ".ply",
         offset=offset,
         scale=scale,
-        is_colorcat=is_colorcat
+        is_colorcat=is_colorcat,
+        level_set=level_set
     )
 
 
@@ -94,7 +95,8 @@ def convert_sdf_samples_to_ply(
     offset=None,
     scale=None,
     max_batch=32 ** 3,
-    is_colorcat=False
+    is_colorcat=False,
+    level_set=0.0
 ):
     """
     Convert sdf samples to .ply
@@ -111,7 +113,7 @@ def convert_sdf_samples_to_ply(
     numpy_3d_sdf_tensor = pytorch_3d_sdf_tensor.numpy()
 
     verts, faces, _, _ = skimage.measure.marching_cubes(
-        numpy_3d_sdf_tensor, level=0.0, spacing=[voxel_size] * 3
+        numpy_3d_sdf_tensor, level=level_set, spacing=[voxel_size] * 3
     )
 
     # transform from voxel coordinates to camera coordinates
@@ -132,7 +134,7 @@ def convert_sdf_samples_to_ply(
     mesh_points_torch = torch.from_numpy(mesh_points).float()
 
     if is_colorcat:
-        annealing_temperature = 0.38
+        annealing_temperature = 0.38 # 1.0 = mean, 0.01 = mode
 
         bin_to_rgb = np.zeros((512, 3))
         range_512 = np.arange(512, dtype=int)

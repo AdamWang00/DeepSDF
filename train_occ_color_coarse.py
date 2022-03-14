@@ -2,6 +2,7 @@
 # Copyright 2004-present Facebook. All Rights Reserved.
 
 import torch
+import torch.nn.functional as F
 import torch.utils.data as data_utils
 import signal
 import sys
@@ -259,10 +260,6 @@ def append_parameter_magnitudes(param_mag_log, model):
         param_mag_log[name].append(param.data.norm().item())
 
 
-def rgb_to_bin(r, g, b, dim=8):
-    return r * dim * dim + g * dim + b
-
-
 def main_function(experiment_directory, continue_from, load_ram):
 
     logging.debug("running " + experiment_directory)
@@ -335,10 +332,6 @@ def main_function(experiment_directory, continue_from, load_ram):
 
     num_samp_per_scene = specs["SamplesPerScene"]
     scene_per_batch = specs["ScenesPerBatch"]
-    clamp_dist = specs["ClampingDistance"]
-    minT = -clamp_dist
-    maxT = clamp_dist
-    enforce_minmax = specs["UseClamping"] if "UseClamping" in specs else True
 
     do_code_regularization = get_spec_with_default(
         specs, "CodeRegularization", True)
@@ -479,38 +472,6 @@ def main_function(experiment_directory, continue_from, load_ram):
         )
     )
 
-    dirs3d = [
-        [1, 0, 0],
-        [-1, 0, 0],
-        [0, 1, 0],
-        [0, -1, 0],
-        [0, 0, 1],
-        [0, 0, -1]
-    ]
-
-    rgb_bin_proportions = torch.zeros((512))
-    for sdf_data, indices in sdf_loader:
-        rgb_idx = sdf_data.reshape(-1, 7)[:, 4:7]
-        rgb_bin_idx = rgb_to_bin(rgb_idx[:, 0], rgb_idx[:, 1], rgb_idx[:, 2]).long()
-        rgb_bin_proportions += 0.7 * torch.bincount(rgb_bin_idx, minlength=512)
-
-        for direction in dirs3d:
-            neighbor_bin_idx = rgb_to_bin(
-                torch.clip(rgb_idx[:, 0] + direction[0], 0, 7),
-                torch.clip(rgb_idx[:, 1] + direction[1], 0, 7),
-                torch.clip(rgb_idx[:, 2] + direction[2], 0, 7)
-            ).long()
-            rgb_bin_proportions += 0.05 * torch.bincount(neighbor_bin_idx, minlength=512)
-
-    rgb_bin_proportions /= torch.sum(rgb_bin_proportions)
-    assert abs(torch.sum(rgb_bin_proportions) - 1) < 1e-5
-
-    rgb_bin_weights = 1 / (0.5 * rgb_bin_proportions + (0.5 / 512))
-    rgb_bin_weights /= torch.dot(rgb_bin_proportions, rgb_bin_weights)
-    assert abs(torch.dot(rgb_bin_proportions, rgb_bin_weights) - 1) < 1e-5
-    rgb_bin_weights = rgb_bin_weights.cuda()
-    rgb_bin_weights.requires_grad = False
-
     for epoch in range(start_epoch, num_epochs + 1):
 
         start = time.time()
@@ -528,39 +489,25 @@ def main_function(experiment_directory, continue_from, load_ram):
             batch_split = scene_per_batch
 
             # Process the input data
-            sdf_data = sdf_data.reshape(-1, 7)  # x, y, z, sdf_gt, *rgb_idx
+            sdf_data = sdf_data.reshape(-1, 7)  # x, y, z, sdf_gt, r, g, b
 
             num_sdf_samples = sdf_data.shape[0]
-            idx_range = torch.arange(num_sdf_samples)
 
             sdf_data.requires_grad = False
 
             xyz = sdf_data[:, 0:3]
             sdf_gt = sdf_data[:, 3]
-            rgb_idx_gt = sdf_data[:, 4:7].long()
-            rgb_bin_idx_gt = rgb_to_bin(rgb_idx_gt[:, 0], rgb_idx_gt[:, 1], rgb_idx_gt[:, 2]).long()
+            rgb_gt = sdf_data[:, 4:7]
 
             if xyz.dtype == torch.float64:
                 xyz = xyz.float()
-
-            rgb_bin_gt = torch.zeros((num_sdf_samples, 512))
-            rgb_bin_gt.requires_grad = False
-            rgb_bin_gt[idx_range, rgb_bin_idx_gt] += 0.7
-            for direction in dirs3d:
-                neighbor_bin_idx = rgb_to_bin(
-                    torch.clip(rgb_idx_gt[:, 0] + direction[0], 0, 7),
-                    torch.clip(rgb_idx_gt[:, 1] + direction[1], 0, 7),
-                    torch.clip(rgb_idx_gt[:, 2] + direction[2], 0, 7)
-                )
-                rgb_bin_gt[idx_range, neighbor_bin_idx] += 0.05
-
-            if enforce_minmax:
-                sdf_gt = torch.clamp(sdf_gt, minT, maxT)
+            
+            if sdf_gt.dtype == torch.float64:
+                sdf_gt = sdf_gt.float()
 
             xyz = torch.chunk(xyz, batch_split)
             sdf_gt = torch.chunk(sdf_gt, batch_split)
-            rgb_bin_idx_gt = torch.chunk(rgb_bin_idx_gt, batch_split)
-            rgb_bin_gt = torch.chunk(rgb_bin_gt, batch_split)
+            rgb_gt = torch.chunk(rgb_gt, batch_split)
 
             batch_loss = 0.0
             batch_sdf_loss = 0.0
@@ -572,39 +519,27 @@ def main_function(experiment_directory, continue_from, load_ram):
                 batch_vec = lat_vecs(indices[i]).cuda()
 
                 # forward pass
-                pred_sdf, pred_rgb_bins = decoder(xyz[i].cuda(), scene_latent=batch_vec)
-
-                if enforce_minmax:
-                    pred_sdf = torch.clamp(pred_sdf, minT, maxT)
+                pred = decoder(xyz[i].cuda(), scene_latent=batch_vec)
+                pred_sdf = pred[:, 0]
+                pred_rgb = pred[:, 1:4]
 
                 batch_sdf_gt = sdf_gt[i].cuda()
-                batch_rgb_bin_idx_gt = rgb_bin_idx_gt[i].cuda()
-                batch_rgb_bin_gt = rgb_bin_gt[i].cuda()
+                batch_rgb_gt = rgb_gt[i].cuda()
 
                 # include color loss for points with |sdf_gt| < threshold
                 mask = torch.where(torch.abs(batch_sdf_gt) <
                                    color_loss_sdf_threshold, 1, 0).unsqueeze(1)
 
-                batch_rgb_bin_gt = torch.mul(batch_rgb_bin_gt, mask)
+                pred_rgb = torch.mul(pred_rgb, mask)
+                batch_rgb_gt = torch.mul(batch_rgb_gt, mask)
 
-                # if i == 0:
-                    # print(torch.min(pred_rgb_bins).item(), torch.max(pred_rgb_bins).item(), torch.min(torch.log(pred_rgb_bins)).item(), torch.max(torch.log(pred_rgb_bins)).item())
-                    # nonzero = torch.nonzero(batch_rgb_bin_gt)
-                    # n0, n1 = nonzero[0:10, 0], nonzero[0:10, 1]
-                    # print("a", batch_rgb_bin_gt.shape)
-                    # print("b", torch.log(pred_rgb_bins).shape)
-                    # print("c", torch.mul(batch_rgb_bin_gt, torch.log(pred_rgb_bins)).shape)
-                    # print("d", torch.sum(torch.mul(batch_rgb_bin_gt, torch.log(pred_rgb_bins)), 1).shape)
-                    # print("e", torch.mul(rgb_bin_weights[batch_rgb_bin_idx_gt],
-                    #     torch.sum(torch.mul(batch_rgb_bin_gt, torch.log(pred_rgb_bins)), 1)).shape)
-                    # print("f", torch.sum(torch.mul(rgb_bin_weights[batch_rgb_bin_idx_gt],
-                    #     torch.sum(torch.mul(batch_rgb_bin_gt, torch.log(pred_rgb_bins)), 1))).shape)
+                # Convert from sdf to occupancy (outside=0 or inside=1)
+                batch_sdf_gt[batch_sdf_gt > 0] = 0
+                batch_sdf_gt[batch_sdf_gt < 0] = 1
 
-                loss_sdf = loss_l1(pred_sdf, batch_sdf_gt) / num_sdf_samples
-
-                pred_rgb_bins = torch.clamp(pred_rgb_bins, min=1e-30) # ensure pred_rgb_bins>0 to avoid div0
-                loss_rgb = -torch.sum(torch.mul(rgb_bin_weights[batch_rgb_bin_idx_gt],
-                    torch.sum(torch.mul(batch_rgb_bin_gt, torch.log(pred_rgb_bins)), 1))) / num_sdf_samples
+                # loss_sdf = loss_l1(pred_sdf, batch_sdf_gt) / num_sdf_samples
+                loss_sdf = F.binary_cross_entropy(pred_sdf, batch_sdf_gt, reduction="sum") / num_sdf_samples
+                loss_rgb = loss_l1(pred_rgb, batch_rgb_gt) / num_sdf_samples
                 loss_rgb *= color_loss_weight
 
                 chunk_loss = loss_sdf + loss_rgb

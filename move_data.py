@@ -9,8 +9,8 @@ from_path = "data"
 to_path = "/mnt/hdd1/awang_scene_synth/deepsdf/data"
 subdirs = [
     "SdfSamples",
-    # "SurfaceSampleFaces",
-    # "SurfaceSamples",
+    "SurfaceSampleFaces",
+    "SurfaceSamples",
 ]
 
 direction_forward = True  # true = from->to, false = to->from

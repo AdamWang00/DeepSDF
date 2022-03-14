@@ -6,36 +6,37 @@ import json
 import os
 
 
-def get_trimesh_and_uv(scene_or_mesh):
-    if isinstance(scene_or_mesh, trimesh.Scene):
-        mesh = trimesh.util.concatenate(
-            tuple(g for g in scene_or_mesh.geometry.values())
-        )
-        uv = np.concatenate(
-            tuple(g.visual.uv for g in scene_or_mesh.geometry.values()),
-            axis=0
-        )
-    else:
-        assert(isinstance(scene_or_mesh, trimesh.Trimesh))
-        mesh = scene_or_mesh
-        uv = mesh.visual.uv
-    return mesh, uv
-
-
 if __name__ == "__main__":
     split_path = "./experiments/splits/nightstand.json"
     split_name_gt = "3D-FUTURE-model"
     # split_category_gt = "category_X"
     # split_categories = ['category_X', 'category_X']
-    experiment_names = ['nightstand2', 'nightstand3c', 'nightstand3b']
+    experiment_names = ['nightstand3b', 'nightstand3d', 'nightstand3e']
     epochs = ['1000'] * len(experiment_names)
-    split_names = ['3D-FUTURE-model', '3D-FUTURE-model', '3D-FUTURE-model']
+    split_names = ['3D-FUTURE-model'] * len(experiment_names)
     num_models = 16
     num_models_offset = 0
     color = True
 
     scene = Scene()
+    viewport_w = 1600
+    viewport_h = 900
     c = 0
+
+    def get_trimesh_and_uv(scene_or_mesh):
+        if isinstance(scene_or_mesh, trimesh.Scene):
+            mesh = trimesh.util.concatenate(
+                tuple(g for g in scene_or_mesh.geometry.values())
+            )
+            uv = np.concatenate(
+                tuple(g.visual.uv for g in scene_or_mesh.geometry.values()),
+                axis=0
+            )
+        else:
+            assert(isinstance(scene_or_mesh, trimesh.Trimesh))
+            mesh = scene_or_mesh
+            uv = mesh.visual.uv
+        return mesh, uv
 
     with open(split_path, "r") as f:
         split = model_ids = json.load(f)[split_name_gt]
@@ -77,10 +78,10 @@ if __name__ == "__main__":
             print("[error]", str(e))
             continue
 
-        print(c, model_id)
+        print(c+1, model_id)
         c += 1
 
-    camera = PerspectiveCamera(yfov=np.pi / 3.0, aspectRatio=1.0)
+    camera = PerspectiveCamera(yfov=np.pi / 3.0, aspectRatio=viewport_w/viewport_h)
     camera_pose = np.array([
         [1.0, 0.0, 0.0, 0.0],
         [0.0, 1.0, 0.0, 0.0],
@@ -89,4 +90,4 @@ if __name__ == "__main__":
     ])
     scene.add(camera, pose=camera_pose)
 
-    Viewer(scene, use_raymond_lighting=True)
+    Viewer(scene, use_raymond_lighting=True, viewport_size=(viewport_w,viewport_h))

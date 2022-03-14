@@ -12,7 +12,11 @@ import deep_sdf
 import deep_sdf.workspace as ws
 
 
-def evaluate(experiment_directory, checkpoint, data_dir, split_filename, max_meshes, keep_normalized=False, source_name_surface=None):
+def evaluate(experiment_directory, checkpoint, data_dir, max_meshes, split_filename=None, keep_normalized=False, source_name_surface=None):
+
+    if split_filename == None:
+        with open(os.path.join(experiment_directory, "specs.json"), "r") as f:
+            split_filename = json.load(f)["TrainSplit"]
 
     with open(split_filename, "r") as f:
         split = json.load(f)
@@ -139,7 +143,7 @@ if __name__ == "__main__":
         "--split",
         "-s",
         dest="split_filename",
-        required=True,
+        default=None,
         help="The split to evaluate.",
     )
     arg_parser.add_argument(
@@ -175,8 +179,8 @@ if __name__ == "__main__":
         args.experiment_directory,
         args.checkpoint,
         args.data_source,
-        args.split_filename,
         int(args.max_meshes),
+        split_filename=args.split_filename,
         keep_normalized=args.keep_normalized,
         source_name_surface=args.source_name_surface
     )

@@ -68,73 +68,75 @@ def preprocess_color(model_path, texture_path, surface_samples_path, surface_sam
     else:
         surface_samples_header_size=9
 
-    # Load model without processing and textures
-    mesh = trimesh.load(model_path, process=False)
-    try:
-        mesh, vertex_uv = get_trimesh_and_uv(mesh)
-    except:
-        print("failed to get mesh and uv", model_path)
-        return
-    textures = Image.open(texture_path)
-
     # Load surface samples and the vertices of the face from which each is sampled
     surface_sample_faces = np.genfromtxt(surface_sample_faces_path)
     num_samples = surface_sample_faces.shape[0] // 3
+
     surface_sample_coords = np.genfromtxt(surface_samples_path, skip_header=surface_samples_header_size, max_rows=num_samples)[:, 0:3]
 
-    # Build k-d tree of the model's face centroids
-    model_face_centroids = np.mean(mesh.vertices[mesh.faces], axis=1)
-    model_face_centroids_kdtree = cKDTree(model_face_centroids)
+    if ignore_surface:
+        samples_color = np.genfromtxt(surface_samples_path, skip_header=surface_samples_header_size, max_rows=num_samples)[:, 3:6]
+    else:
+        # Load model without processing and textures
+        mesh = trimesh.load(model_path, process=False)
+        try:
+            mesh, vertex_uv = get_trimesh_and_uv(mesh)
+        except:
+            print("failed to get mesh and uv", model_path)
+            return
+        textures = Image.open(texture_path)
 
-    # Match each surface sample to the face of the model from which it is sampled
-    sample_face_centroids = np.mean(np.reshape(surface_sample_faces, (-1, 3, 3)), axis=1)
-    _, sample_face_indices = model_face_centroids_kdtree.query(sample_face_centroids)
+        # Build k-d tree of the model's face centroids
+        model_face_centroids = np.mean(mesh.vertices[mesh.faces], axis=1)
+        model_face_centroids_kdtree = cKDTree(model_face_centroids)
 
-    # Get the UV positions of the vertices of the model faces
-    sample_triangles = mesh.vertices[mesh.faces[sample_face_indices]]
-    sample_triangles_uv = vertex_uv[mesh.faces[sample_face_indices]]
+        # Match each surface sample to the face of the model from which it is sampled
+        sample_face_centroids = np.mean(np.reshape(surface_sample_faces, (-1, 3, 3)), axis=1)
+        _, sample_face_indices = model_face_centroids_kdtree.query(sample_face_centroids)
 
-    # Gets the barycentric coordinates of each sample in the simplex defined by points.
-    # Also returns the order of the simplex points used to form the simplex
-    def barycentric_coords(points, sample):
-        dim = len(points[0])
-        tri = Delaunay(points)
-        s = 0 # tri.find_simplex(sample)
-        b = tri.transform[s, :dim].dot(np.transpose(sample - tri.transform[s, dim]))
-        return np.append(b, 1 - b.sum()), tri.simplices[s]
+        # Get the UV positions of the vertices of the model faces
+        sample_triangles = mesh.vertices[mesh.faces[sample_face_indices]]
+        sample_triangles_uv = vertex_uv[mesh.faces[sample_face_indices]]
 
-    # Use barycentric coordinates to calculate the UV position of each sample
-    samples_uv = np.empty((num_samples, 2))
-    for i in range(num_samples):
-        b_coords_best = None
-        points_indices_best = None
-        loss_best = 1
-        planes = [[0, 1], [0, 2], [1, 2]]
+        # Gets the barycentric coordinates of each sample in the simplex defined by points.
+        # Also returns the order of the simplex points used to form the simplex
+        def barycentric_coords(points, sample):
+            dim = len(points[0])
+            tri = Delaunay(points)
+            s = 0 # tri.find_simplex(sample)
+            b = tri.transform[s, :dim].dot(np.transpose(sample - tri.transform[s, dim]))
+            return np.append(b, 1 - b.sum()), tri.simplices[s]
 
-        for plane in planes:
-            points = np.transpose(sample_triangles[i, :, plane])
-            sample = surface_sample_coords[i, plane]
-            try:
-                # Barycentric transform using 2D projections of triangle vertices
-                b_coords, points_indices = barycentric_coords(points, sample)
-            except sp.spatial.qhull.QhullError:
-                continue
-            reconstructed = np.dot(b_coords, sample_triangles[i][points_indices])
-            loss = np.linalg.norm(reconstructed - surface_sample_coords[i])
-            if (loss < loss_best):
-                b_coords_best = b_coords
-                points_indices_best = points_indices
-                loss_best = loss
-        
-        if b_coords_best is None:
-            samples_uv[i] = [0, 0]
-        else :
-            samples_uv[i] = np.dot(b_coords_best, sample_triangles_uv[i][points_indices_best])
+        # Use barycentric coordinates to calculate the UV position of each sample
+        samples_uv = np.empty((num_samples, 2))
+        for i in range(num_samples):
+            b_coords_best = None
+            points_indices_best = None
+            loss_best = 1
+            planes = [[0, 1], [0, 2], [1, 2]]
 
-    samples_color = uv_to_color(samples_uv, textures)[:, 0:3] # discard alpha
+            for plane in planes:
+                points = np.transpose(sample_triangles[i, :, plane])
+                sample = surface_sample_coords[i, plane]
+                try:
+                    # Barycentric transform using 2D projections of triangle vertices
+                    b_coords, points_indices = barycentric_coords(points, sample)
+                except sp.spatial.qhull.QhullError:
+                    continue
+                reconstructed = np.dot(b_coords, sample_triangles[i][points_indices])
+                loss = np.linalg.norm(reconstructed - surface_sample_coords[i])
+                if (loss < loss_best):
+                    b_coords_best = b_coords
+                    points_indices_best = points_indices
+                    loss_best = loss
+            
+            if b_coords_best is None:
+                samples_uv[i] = [0, 0]
+            else :
+                samples_uv[i] = np.dot(b_coords_best, sample_triangles_uv[i][points_indices_best])
 
-    # add color to the surface samples (.ply)
-    if not ignore_surface:
+        samples_color = uv_to_color(samples_uv, textures)[:, 0:3] # discard alpha
+
         surface_samples = trimesh.load(surface_samples_path, process=False)
         surface_samples.visual.vertex_colors = samples_color
         assert surface_samples.visual.kind == 'vertex'
@@ -228,6 +230,13 @@ if __name__ == "__main__":
         + "directory name.",
     )
     arg_parser.add_argument(
+        "--name_surface",
+        dest="source_name_surface",
+        default=None,
+        help="The name to use for the data source. If unspecified, it defaults to the "
+        + "directory name.",
+    )
+    arg_parser.add_argument(
         "--split",
         dest="split_filename",
         required=True,
@@ -273,9 +282,12 @@ if __name__ == "__main__":
     if args.source_name is None:
         args.source_name = os.path.basename(os.path.normpath(args.source_dir))
 
+    if args.source_name_surface is None:
+        args.source_name_surface = args.source_name
+
     mesh_dir = args.source_dir
-    surface_samples_dir = os.path.join(args.data_dir, ws.surface_samples_subdir, args.source_name)
-    surface_samples_faces_dir = os.path.join(args.data_dir, ws.surface_sample_faces_subdir, args.source_name)
+    surface_samples_dir = os.path.join(args.data_dir, ws.surface_samples_subdir, args.source_name_surface)
+    surface_samples_faces_dir = os.path.join(args.data_dir, ws.surface_sample_faces_subdir, args.source_name_surface)
     sdf_samples_dir = os.path.join(args.data_dir, ws.sdf_samples_subdir, args.source_name)
 
     preprocess_color_inputs = []

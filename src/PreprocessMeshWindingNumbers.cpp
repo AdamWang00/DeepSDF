@@ -16,31 +16,20 @@
 #include <CLI/CLI.hpp>
 #include <cnpy.h>
 
+#include <igl/fast_winding_number.h>
+
 #include "Utils.h"
 
 extern pangolin::GlSlProgram GetShaderProgram();
 
 void SampleFromSurface(
     pangolin::Geometry& geom,
+    std::vector<Eigen::Vector3i>& linearized_faces,
     std::vector<Eigen::Vector3f>& surfpts,
     int num_sample) {
   float total_area = 0.0f;
 
   std::vector<float> cdf_by_area;
-
-  std::vector<Eigen::Vector3i> linearized_faces;
-
-  for (const auto& object : geom.objects) {
-    auto it_vert_indices = object.second.attributes.find("vertex_indices");
-    if (it_vert_indices != object.second.attributes.end()) {
-      pangolin::Image<uint32_t> ibo =
-          pangolin::get<pangolin::Image<uint32_t>>(it_vert_indices->second);
-
-      for (int i = 0; i < ibo.h; ++i) {
-        linearized_faces.emplace_back(ibo(0, i), ibo(1, i), ibo(2, i));
-      }
-    }
-  }
 
   pangolin::Image<float> vertices =
       pangolin::get<pangolin::Image<float>>(geom.buffers["geometry"].attributes["vertex"]);
@@ -86,7 +75,9 @@ void SampleFromSurface(
 
 void SampleSDFNearSurface(
     KdVertexListTree& kdTree,
-    std::vector<Eigen::Vector3f>& vertices,
+    std::vector<Eigen::Vector3f>& vertices1,
+    std::vector<Eigen::Vector3f>& vertices2,
+    std::vector<Eigen::Vector3i>& faces,
     std::vector<Eigen::Vector3f>& xyz_surf,
     std::vector<Eigen::Vector3f>& normals,
     std::vector<Eigen::Vector3f>& xyz,
@@ -106,7 +97,7 @@ void SampleSDFNearSurface(
 
   std::random_device rd;
   std::mt19937 rng(rd());
-  std::uniform_int_distribution<int> vert_ind(0, vertices.size() - 1);
+  std::uniform_int_distribution<int> vert_ind(0, vertices2.size() - 1);
   std::normal_distribution<float> perterb_norm(0, stdv);
   std::normal_distribution<float> perterb_second(0, sqrt(second_variance));
 
@@ -132,42 +123,106 @@ void SampleSDFNearSurface(
   }
 
   // now compute sdf for each xyz sample
+  // for (int s = 0; s < (int)xyz.size(); s++) {
+  //   Eigen::Vector3f samp_vert = xyz[s];
+  //   std::vector<int> cl_indices(num_votes);
+  //   std::vector<float> cl_distances(num_votes);
+  //   kdTree.knnSearch(samp_vert.data(), num_votes, cl_indices.data(), cl_distances.data());
+
+  //   int num_pos = 0;
+  //   float sdf;
+
+  //   for (int ind = 0; ind < num_votes; ind++) {
+  //     uint32_t cl_ind = cl_indices[ind];
+  //     Eigen::Vector3f cl_vert = vertices2[cl_ind];
+  //     Eigen::Vector3f ray_vec = samp_vert - cl_vert;
+  //     float ray_vec_leng = ray_vec.norm();
+
+  //     if (ind == 0) {
+  //       // if close to the surface, use point plane distance
+  //       if (ray_vec_leng < stdv)
+  //         sdf = fabs(normals[cl_ind].dot(ray_vec));
+  //       else
+  //         sdf = ray_vec_leng;
+  //     }
+
+  //     float d = normals[cl_ind].dot(ray_vec / ray_vec_leng);
+  //     if (d > 0)
+  //       num_pos++;
+  //   }
+
+  //   // all or nothing , else ignore the point
+  //   if ((num_pos == 0) || (num_pos == num_votes)) {
+  //     xyz_used.push_back(samp_vert);
+  //     if (num_pos <= (num_votes / 2)) {
+  //       sdf = -sdf;
+  //     }
+  //     sdfs.push_back(sdf);
+  //   }
+
+  //   int leeway = 3;
+  //   if ((num_pos <= leeway) || (num_pos >= num_votes - leeway)) {
+  //     xyz_used.push_back(samp_vert);
+  //     if (num_pos <= (num_votes / 2)) {
+  //       sdf = -sdf;
+  //     }
+  //     sdfs.push_back(sdf);
+  //   }
+  // }
+
   for (int s = 0; s < (int)xyz.size(); s++) {
     Eigen::Vector3f samp_vert = xyz[s];
-    std::vector<int> cl_indices(num_votes);
-    std::vector<float> cl_distances(num_votes);
-    kdTree.knnSearch(samp_vert.data(), num_votes, cl_indices.data(), cl_distances.data());
+    // use num_votes = 1 (i.e. only 1 nearest neighbor)
+    std::vector<int> cl_indices(1);
+    std::vector<float> cl_distances(1);
+    kdTree.knnSearch(samp_vert.data(), 1, cl_indices.data(), cl_distances.data());
 
-    int num_pos = 0;
     float sdf;
 
-    for (int ind = 0; ind < num_votes; ind++) {
-      uint32_t cl_ind = cl_indices[ind];
-      Eigen::Vector3f cl_vert = vertices[cl_ind];
-      Eigen::Vector3f ray_vec = samp_vert - cl_vert;
-      float ray_vec_leng = ray_vec.norm();
+    uint32_t cl_ind = cl_indices[0];
+    Eigen::Vector3f cl_vert = vertices2[cl_ind];
+    Eigen::Vector3f ray_vec = samp_vert - cl_vert;
+    float ray_vec_leng = ray_vec.norm();
 
-      if (ind == 0) {
-        // if close to the surface, use point plane distance
-        if (ray_vec_leng < stdv)
-          sdf = fabs(normals[cl_ind].dot(ray_vec));
-        else
-          sdf = ray_vec_leng;
-      }
+    // if close to the surface, use point plane distance
+    if (ray_vec_leng < stdv)
+      sdf = fabs(normals[cl_ind].dot(ray_vec));
+    else
+      sdf = ray_vec_leng;
 
-      float d = normals[cl_ind].dot(ray_vec / ray_vec_leng);
-      if (d > 0)
-        num_pos++;
+    // use all xyz/sdf
+    xyz_used.push_back(samp_vert);
+    sdfs.push_back(sdf);
+  }
+
+  // use winding number to determine sdf sign (+/-)
+  Eigen::MatrixXf V(vertices1.size(), 3);
+  for (int i = 0; i < vertices1.size(); i++) {
+    V.row(i) = vertices1[i];
+  }
+
+  Eigen::MatrixXi F(faces.size(), 3);
+  for (int i = 0; i < faces.size(); i++) {
+    F.row(i) = faces[i];
+  }
+
+  igl::FastWindingNumberBVH fwn_bvh;
+  igl::fast_winding_number(V, F, 2, fwn_bvh);
+
+  Eigen::MatrixXf Q(xyz_used.size(), 3);
+  for (int i = 0; i < xyz_used.size(); i++) {
+    Q.row(i) = xyz_used[i];
+  }
+
+  Eigen::VectorXf W;
+  igl::fast_winding_number(fwn_bvh, 2, Q, W);
+
+  float inside_threshold = 0.5;
+  for (int i = 0; i < W.size(); i++) {
+    if (W[i] > inside_threshold || W[i] < -inside_threshold) { // likely inside mesh
+      sdfs[i] = -sdfs[i];
     }
-
-    // all or nothing , else ignore the point
-    if ((num_pos == 0) || (num_pos == num_votes)) {
-      xyz_used.push_back(samp_vert);
-      if (num_pos <= (num_votes / 2)) {
-        sdf = -sdf;
-      }
-      sdfs.push_back(sdf);
-    }
+    // sdfs[i] = W[i]; // uncomment this to debug/inspect W values (overwrites sdf)
   }
 
   xyz = xyz_used;
@@ -529,12 +584,41 @@ int main(int argc, char** argv) {
   std::vector<float> sdf;
   int num_samp_near_surf = (int)(num_samp_near_surf_ratio * num_sample);
   std::cout << "num_samp_near_surf: " << num_samp_near_surf << std::endl;
-  SampleFromSurface(geom, xyz_surf, num_samp_near_surf / 2);
+
+  std::vector<Eigen::Vector3f> vertices1;
+  std::vector<Eigen::Vector3i> linearized_faces;
+
+  for (const auto& buffer : geom.buffers) {
+    auto it_vert = buffer.second.attributes.find("vertex");
+    if (it_vert != buffer.second.attributes.end()) {
+      pangolin::Image<float> ibo =
+          pangolin::get<pangolin::Image<float>>(it_vert->second);
+      for (int i = 0; i < ibo.h; ++i) {
+        vertices1.emplace_back(ibo.RowPtr(i));
+      }
+    }
+  }
+
+  for (const auto& object : geom.objects) {
+    auto it_vert_indices = object.second.attributes.find("vertex_indices");
+    if (it_vert_indices != object.second.attributes.end()) {
+      pangolin::Image<uint32_t> ibo =
+          pangolin::get<pangolin::Image<uint32_t>>(it_vert_indices->second);
+
+      for (int i = 0; i < ibo.h; ++i) {
+        linearized_faces.emplace_back(ibo(0, i), ibo(1, i), ibo(2, i));
+      }
+    }
+  }
+  
+  SampleFromSurface(geom, linearized_faces, xyz_surf, num_samp_near_surf / 2);
 
   auto start = std::chrono::high_resolution_clock::now();
   SampleSDFNearSurface(
       kdTree_surf,
+      vertices1,
       vertices2,
+      linearized_faces,
       xyz_surf,
       normals2,
       xyz,

@@ -334,7 +334,7 @@ def main_function(experiment_directory, continue_from, load_ram):
     clamp_dist = specs["ClampingDistance"]
     minT = -clamp_dist
     maxT = clamp_dist
-    enforce_minmax = True
+    enforce_minmax = specs["UseClamping"] if "UseClamping" in specs else True
 
     do_code_regularization = get_spec_with_default(
         specs, "CodeRegularization", True)
