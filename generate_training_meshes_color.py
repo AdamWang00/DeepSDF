@@ -11,7 +11,7 @@ import deep_sdf
 import deep_sdf.workspace as ws
 
 
-BBOX_FACTOR = 1.01  # samples from BBOX_FACTOR times the bounding box size
+BBOX_FACTOR = 1.02  # samples from BBOX_FACTOR times the bounding box size
 LEVEL_SET = 0.0 # SDF value used to determine surface level set
 SAMPLING_DIM = 256
 

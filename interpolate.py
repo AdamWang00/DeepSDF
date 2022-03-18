@@ -6,16 +6,16 @@ import deep_sdf
 import deep_sdf.workspace as ws
 
 
-experiment_directory = "experiments/nightstand2"
+experiment_directory = "experiments/nightstand3MSemiGlobal"
 epoch = "latest"
 mesh_id1 = "c2f29b88-e421-4b9c-ab06-50e9e83cf8a1"
 mesh_id2 = "b6ec33de-c372-407c-b5b7-141436b02e7b"
 
 num_interpolations = 32
-bbox_factor = 1.01  # samples from BBOX_FACTOR times the bounding box size
+bbox_factor = 1.02  # samples from BBOX_FACTOR times the bounding box size
 level_set = 0.0 # SDF value used to determine surface level set
 sampling_dim = 256
-is_colorcat = False
+is_colorcat = True
 
 if num_interpolations < 2:
     raise Exception("number of interpolations must be at least 2")

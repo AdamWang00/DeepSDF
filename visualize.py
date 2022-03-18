@@ -11,9 +11,9 @@ if __name__ == "__main__":
     split_name_gt = "3D-FUTURE-model"
     # split_category_gt = "category_X"
     # split_categories = ['category_X', 'category_X']
-    experiment_names = ['nightstand3b', 'nightstand3d', 'nightstand3e']
+    experiment_names = ['nightstand3MGlobal', 'nightstand3MSemiGlobal', 'nightstand3M']
     epochs = ['1000'] * len(experiment_names)
-    split_names = ['3D-FUTURE-model'] * len(experiment_names)
+    split_names = ['3D-FUTURE-model_manifold', '3D-FUTURE-model_manifold', '3D-FUTURE-model_manifold']
     num_models = 16
     num_models_offset = 0
     color = True

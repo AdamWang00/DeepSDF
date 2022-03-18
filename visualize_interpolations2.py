@@ -5,7 +5,7 @@ import os
 import time
 
 
-experiment_directory = "experiments/nightstand2"
+experiment_directory = "experiments/nightstand3MSemiGlobal"
 epoch = "latest"
 mesh_id1 = "c2f29b88-e421-4b9c-ab06-50e9e83cf8a1"
 mesh_id2 = "b6ec33de-c372-407c-b5b7-141436b02e7b"
