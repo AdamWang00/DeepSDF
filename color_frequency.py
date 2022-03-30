@@ -5,7 +5,7 @@ import os
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 
-split_path = "./experiments/splits/bed.json"
+split_path = "./experiments/splits/nightstand.json"
 split_name = "3D-FUTURE-model"
 sdf_abs_threshold = 0.01
 

@@ -11,12 +11,21 @@ import deep_sdf.workspace as ws
 import numpy as np
 import scipy as sp
 import trimesh
-from skimage import color
 from trimesh.visual import uv_to_color
 from PIL import Image
 from scipy.spatial import Delaunay, cKDTree
 
-COLOR_BINS_KEY = "average"
+# dirs3d = [
+#     [1, 0, 0],
+#     [-1, 0, 0],
+#     [0, 1, 0],
+#     [0, -1, 0],
+#     [0, 0, 1],
+#     [0, 0, -1]
+# ]
+
+# def rgb_to_bin(r, g, b, dim=8):
+#     return r * dim * dim + g * dim + b
 
 def get_trimesh_and_uv(scene_or_mesh):
     if isinstance(scene_or_mesh, trimesh.Scene):
@@ -34,13 +43,14 @@ def get_trimesh_and_uv(scene_or_mesh):
     return mesh, uv
 
 
-def preprocess_color(model_path, texture_path, surface_samples_path, surface_sample_faces_path, sdf_path, color_bins_path, ignore_sdf=False, ignore_surface=False, overwrite_sdf=False):
+def preprocess_color(model_path, texture_path, surface_samples_path, surface_sample_faces_path, sdf_path, ignore_sdf=False, ignore_surface=False, overwrite_sdf=False):
     # Load SDF samples
     sdf = np.load(sdf_path)
     sdf_pos = sdf["pos"]
     sdf_neg = sdf["neg"]
 
-    output_shape = 4 + 1 # input_shape (4) + bin index (1)
+    # output_shape = 4 + 1 + 512 # input_shape (4) + bin index (1) + color bins (512)
+    output_shape = 4 + 3 # input_shape (4) + rgb bin indices (3)
     if ignore_sdf: # if we only want to add color to the surface samples (.ply)
         print("ignoring sdf")
     elif sdf_pos.shape[1] == output_shape and sdf_neg.shape[1] == output_shape:
@@ -50,8 +60,8 @@ def preprocess_color(model_path, texture_path, surface_samples_path, surface_sam
             print("sdf already contains color, skipping...")
             return
     elif sdf_pos.shape[1] != 4 or sdf_neg.shape[1] != 4:
-        print("unexpected sdf, overwriting")
-        # return
+        print("invalid sdf")
+        return
 
     if ignore_surface:
         surface_samples_header_size=14
@@ -137,29 +147,51 @@ def preprocess_color(model_path, texture_path, surface_samples_path, surface_sam
         surface_sample_kdtree = cKDTree(surface_sample_coords)
         _, sdf_pos_indices = surface_sample_kdtree.query(sdf_pos[:, 0:3])
         _, sdf_neg_indices = surface_sample_kdtree.query(sdf_neg[:, 0:3])
-        surface_sample_kdtree = None # gc
 
-        # RGB of closest surface sample
+        # Concatenate RGB of closest surface sample onto each sdf sample
         sdf_pos_color = samples_color[sdf_pos_indices]
         sdf_neg_color = samples_color[sdf_neg_indices]
 
-        sdf_pos_lab = color.rgb2lab(sdf_pos_color / 255)
-        sdf_neg_lab = color.rgb2lab(sdf_neg_color / 255)
+        # R index, G index, B index
+        sdf_pos_color_rgb_idx = np.clip((sdf_pos_color / 32).astype(np.int), 0, 7)
+        sdf_neg_color_rgb_idx = np.clip((sdf_neg_color / 32).astype(np.int), 0, 7)
 
-        color_bins_lab = np.load(color_bins_path)[COLOR_BINS_KEY]
-        color_bins_kdtree = cKDTree(color_bins_lab)
-        _, sdf_pos_indices = color_bins_kdtree.query(sdf_pos_lab)
-        _, sdf_neg_indices = color_bins_kdtree.query(sdf_neg_lab)
+        # Bin index
+        # sdf_pos_color_bin_idx = rgb_to_bin(sdf_pos_color_rgb_idx[:, 0], sdf_pos_color_rgb_idx[:, 1], sdf_pos_color_rgb_idx[:, 2])
+        # sdf_neg_color_bin_idx = rgb_to_bin(sdf_neg_color_rgb_idx[:, 0], sdf_neg_color_rgb_idx[:, 1], sdf_neg_color_rgb_idx[:, 2])
 
-        print(sdf_pos_indices[0:5], color_bins_lab[sdf_pos_indices[0:5]], sdf_pos_lab[0:5])
+        # 512 bins
+        # sdf_pos_color_bins = np.zeros((num_pos, 512))
+        # sdf_neg_color_bins = np.zeros((num_neg, 512))
+
+        # sdf_pos_color_bins[range_pos, sdf_pos_color_bin_idx] += 0.7
+        # sdf_neg_color_bins[range_neg, sdf_neg_color_bin_idx] += 0.7
+
+        # for direction in dirs3d:
+        #     pos_neighbor_bin_idx = rgb_to_bin(
+        #         np.clip(sdf_pos_color_rgb_idx[:, 0] + direction[0], 0, 7),
+        #         np.clip(sdf_pos_color_rgb_idx[:, 1] + direction[1], 0, 7),
+        #         np.clip(sdf_pos_color_rgb_idx[:, 2] + direction[2], 0, 7)
+        #     )
+        #     neg_neighbor_bin_idx = rgb_to_bin(
+        #         np.clip(sdf_neg_color_rgb_idx[:, 0] + direction[0], 0, 7),
+        #         np.clip(sdf_neg_color_rgb_idx[:, 1] + direction[1], 0, 7),
+        #         np.clip(sdf_neg_color_rgb_idx[:, 2] + direction[2], 0, 7)
+        #     )
+        #     sdf_pos_color_bins[range_pos, pos_neighbor_bin_idx] += 0.05
+        #     sdf_neg_color_bins[range_neg, neg_neighbor_bin_idx] += 0.05
 
         sdf_pos = np.concatenate((
             sdf_pos[:, 0:4],
-            np.expand_dims(sdf_pos_indices, 1),
+            # np.expand_dims(sdf_pos_color_bin_idx, 1),
+            # sdf_pos_color_bins
+            sdf_pos_color_rgb_idx
         ), axis=1)
         sdf_neg = np.concatenate((
             sdf_neg[:, 0:4],
-            np.expand_dims(sdf_neg_indices, 1),
+            # np.expand_dims(sdf_neg_color_bin_idx, 1),
+            # sdf_neg_color_bins
+            sdf_neg_color_rgb_idx
         ), axis=1)
 
         np.savez(sdf_path, pos=sdf_pos.astype('float32'), neg=sdf_neg.astype('float32'))
@@ -227,12 +259,6 @@ if __name__ == "__main__":
         action="store_true",
         help="If set, sdf samples overwritten.",
     )
-    arg_parser.add_argument(
-        "--color_bins",
-        dest="color_bins",
-        required=True,
-        help="Filepath to color bins.",
-    )
 
     deep_sdf.add_common_args(arg_parser)
 
@@ -241,7 +267,6 @@ if __name__ == "__main__":
     ignore_sdf = args.ignore_sdf
     ignore_surface = args.ignore_surface
     overwrite_sdf = args.overwrite_sdf
-    color_bins_path = args.color_bins
 
     deep_sdf.configure_logging(args)
 
@@ -286,8 +311,7 @@ if __name__ == "__main__":
                         texture_class_instance_path,
                         surface_samples_class_instance_path,
                         surface_sample_faces_class_instance_path,
-                        sdf_samples_class_instance_path,
-                        color_bins_path
+                        sdf_samples_class_instance_path
                     )
                 )
             except deep_sdf.data.NoMeshFileError:
@@ -299,5 +323,5 @@ if __name__ == "__main__":
     total = len(preprocess_color_inputs)
     for args in preprocess_color_inputs:
         c += 1
-        print(c, "of", total, args[4])
+        print(c, "of", total, args[0])
         preprocess_color(*args, ignore_sdf=ignore_sdf, ignore_surface=ignore_surface, overwrite_sdf=overwrite_sdf)

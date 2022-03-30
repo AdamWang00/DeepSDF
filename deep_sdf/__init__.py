@@ -4,6 +4,7 @@
 from deep_sdf.data import *
 from deep_sdf.mesh import *
 from deep_sdf.mesh_color import *
+from deep_sdf.mesh_colorcat import *
 from deep_sdf.metrics.chamfer import *
 from deep_sdf.utils import *
 from deep_sdf.workspace import *

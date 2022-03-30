@@ -8,6 +8,7 @@ experiments
 build
 bin
 scratch_work
+color_bins
 
 *.ply
 *.obj

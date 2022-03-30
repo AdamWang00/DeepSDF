@@ -6,11 +6,12 @@ import matplotlib.pyplot as plt
 save_to = 'cloud.ply'
 save_to_hist = 'cloud_hist.png'
 # aa4714b2-e1f4-40b9-b680-5ee2d82c920b a2a8b471-48b3-4dd9-9ffd-dcf66d72dd58 192ac441-48b7-4559-bc02-7c532171b531 0ecff51f-5f8e-4ac7-b28a-d98d19446ff2
-sdf_path = 'data/SdfSamples/3D-FUTURE-model_manifold/category_2/0ecff51f-5f8e-4ac7-b28a-d98d19446ff2.npz'
+sdf_path = 'data/SdfSamples/3D-FUTURE-model/category_2/aa4714b2-e1f4-40b9-b680-5ee2d82c920b.npz'
 # sdf_path = 'data/SdfSamples/3D-FUTURE-model/category_13/81aec6cd-34d7-4619-81e6-56bd1cdc1265.npz'
-sdf_abs = 0.01
+sdf_abs = 0.05
 sdf_lower = -0.01
 sdf_upper = 0.01
+is_colorcat = True
 
 sdf = np.load(sdf_path)
 sdf_pos = sdf["pos"]
@@ -32,8 +33,54 @@ print(np.min(sdf_all[:, 0]), np.max(sdf_all[:, 0]), np.min(sdf_all[:, 1]), np.ma
 # plt.show()
 
 vertices = sdf_all[::, 0:3]
-# vertex_colors = sdf_all[:, 4:7]
-vertex_colors = np.clip(-sdf_all[::, [3, 3, 3]] * 10000 + 128, 0, 255)
+vertex_colors = sdf_all[:, 4:7]
+# vertex_colors = np.clip(-sdf_all[::, [3, 3, 3]] * 100000 + 128, 0, 255)
+
+if is_colorcat:
+    def rgb_to_bin(r, g, b, dim=8):
+        return r * dim * dim + g * dim + b
+
+    annealing_temperature = 0.38 # 1.0 = mean, 0.01 = mode
+
+    bin_to_rgb = np.zeros((512, 3))
+    range_512 = np.arange(512, dtype=int)
+
+    # e.g. [16, 48, ..., 240]
+    offset = 16
+    scale = 32
+
+    bin_to_rgb[:, 0] = offset + scale * np.mod(np.floor_divide(range_512, 8 * 8), 8) # r
+    bin_to_rgb[:, 1] = offset + scale * np.mod(np.floor_divide(range_512, 8), 8) # g
+    bin_to_rgb[:, 2] = offset + scale * np.mod(range_512, 8) # b
+
+    vertex_colors = vertex_colors.astype(np.int)
+
+    bin_idx = rgb_to_bin(vertex_colors[:, 0], vertex_colors[:, 1], vertex_colors[:, 2]) # index of 512
+
+    num_verts = vertex_colors.shape[0]
+    vertex_colors_512 = np.zeros((num_verts, 512))
+    idx_range = np.arange(num_verts)
+
+    dirs3d = [
+        [1, 0, 0],
+        [-1, 0, 0],
+        [0, 1, 0],
+        [0, -1, 0],
+        [0, 0, 1],
+        [0, 0, -1]
+    ]
+    vertex_colors_512[idx_range, bin_idx] += 1.0
+    for direction in dirs3d:
+        neighbor_bin_idx = rgb_to_bin(
+            np.clip(vertex_colors[:, 0] + direction[0], 0, 7),
+            np.clip(vertex_colors[:, 1] + direction[1], 0, 7),
+            np.clip(vertex_colors[:, 2] + direction[2], 0, 7)
+        )
+        vertex_colors_512[idx_range, neighbor_bin_idx] += 0.00
+
+    vertex_colors = np.exp(np.log(vertex_colors_512+1e-10) / annealing_temperature)
+    vertex_colors = np.divide(vertex_colors.T, np.sum(vertex_colors, axis=1)).T
+    vertex_colors = vertex_colors @ bin_to_rgb
 
 mesh = trimesh.Trimesh(vertices=vertices, vertex_colors=vertex_colors)
 

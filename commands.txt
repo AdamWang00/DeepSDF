@@ -9,7 +9,7 @@ Preprocess with Color
     Add Color, Categorical
         python preprocess_colorcat.py --data_dir ./data --source ../data/3D-FUTURE-model/ --name 3D-FUTURE-model --split ./experiments/splits/x.json
         python preprocess_colorcat.py --data_dir ./data --source ../data/3D-FUTURE-model/ --name 3D-FUTURE-model --split ./experiments/splits/x.json --ignore_sdf --ignore_surface
-        python preprocess_colorcat.py --data_dir ./data --source ../data/3D-FUTURE-model_manifold/ --name 3D-FUTURE-model_manifold --name_surface 3D-FUTURE-model --split ./experiments/splits/x.json --ignore_surface
+        python preprocess_colorcat.py --data_dir ./data --source ../data/3D-FUTURE-model_manifold/ --name 3D-FUTURE-model_manifold --name_surface 3D-FUTURE-model --split ./experiments/splits/x.json --ignore_surface --color_bins ./color_bins/x/clusters.npz
 
 Train with Color
     New Training
@@ -22,6 +22,8 @@ Plot Logs
         python plot_log.py -e experiments/chair
     With sdf/color loss
         python plot_log.py -c -e experiments/chair
+    With lipschitz loss
+        python plot_log.py -c -l -e experiments/chair
 
 Reconstruct
     Training (color):

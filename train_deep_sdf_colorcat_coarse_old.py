@@ -10,11 +10,10 @@ import logging
 import math
 import json
 import time
-import numpy as np
 
 import deep_sdf
 import deep_sdf.workspace as ws
-from deep_sdf.utils import compute_soft_encoding_lookup_table
+
 
 class LearningRateSchedule:
     def get_learning_rate(self, epoch):
@@ -489,20 +488,28 @@ def main_function(experiment_directory, continue_from, load_ram):
         )
     )
 
-    color_bins_path = specs["ColorBinsPath"]
-    color_bins_key = specs["ColorBinsKey"]
-    print("using color bins from", color_bins_path)
-    color_soft_encoding_num_closest = get_spec_with_default(specs, "ColorSoftEncodingNumClosest", 8)
-    color_soft_encoding_sigma = get_spec_with_default(specs, "ColorSoftEncodingSigma", 5.0)
-
-    color_bins_lab = np.load(color_bins_path)[color_bins_key]
-    color_bin_soft_encodings_table = compute_soft_encoding_lookup_table(color_bins_lab, num_closest=color_soft_encoding_num_closest, sigma=color_soft_encoding_sigma)
-    color_bin_soft_encodings_table = torch.from_numpy(color_bin_soft_encodings_table)
+    dirs3d = [
+        [1, 0, 0],
+        [-1, 0, 0],
+        [0, 1, 0],
+        [0, -1, 0],
+        [0, 0, 1],
+        [0, 0, -1]
+    ]
 
     rgb_bin_proportions = torch.zeros((512))
     for sdf_data, indices in sdf_loader:
-        rgb_bin_idx = sdf_data.reshape(-1, 5)[:, 4].long()
-        rgb_bin_proportions += torch.sum(color_bin_soft_encodings_table[rgb_bin_idx, :], 0)
+        rgb_idx = sdf_data.reshape(-1, 7)[:, 4:7]
+        rgb_bin_idx = rgb_to_bin(rgb_idx[:, 0], rgb_idx[:, 1], rgb_idx[:, 2]).long()
+        rgb_bin_proportions += 0.7 * torch.bincount(rgb_bin_idx, minlength=512)
+
+        for direction in dirs3d:
+            neighbor_bin_idx = rgb_to_bin(
+                torch.clip(rgb_idx[:, 0] + direction[0], 0, 7),
+                torch.clip(rgb_idx[:, 1] + direction[1], 0, 7),
+                torch.clip(rgb_idx[:, 2] + direction[2], 0, 7)
+            ).long()
+            rgb_bin_proportions += 0.05 * torch.bincount(neighbor_bin_idx, minlength=512)
 
     rgb_bin_proportions /= torch.sum(rgb_bin_proportions)
     assert abs(torch.sum(rgb_bin_proportions) - 1) < 1e-5
@@ -523,14 +530,14 @@ def main_function(experiment_directory, continue_from, load_ram):
 
         adjust_learning_rate(lr_schedules, optimizer_all, epoch)
 
-        # sdf_data.shape is [ScenesPerBatch, SamplesPerScene, 5]
+        # sdf_data.shape is [ScenesPerBatch, SamplesPerScene, 7]
         for sdf_data, indices in sdf_loader:
 
             # we want to split the batch such that each mini batch = 1 scene (i.e. 1 latent code)
             batch_split = scene_per_batch
 
             # Process the input data
-            sdf_data = sdf_data.reshape(-1, 5)  # x, y, z, sdf_gt, color_bin_idx
+            sdf_data = sdf_data.reshape(-1, 7)  # x, y, z, sdf_gt, *rgb_idx
 
             num_sdf_samples = sdf_data.shape[0]
             idx_range = torch.arange(num_sdf_samples)
@@ -539,11 +546,22 @@ def main_function(experiment_directory, continue_from, load_ram):
 
             xyz = sdf_data[:, 0:3]
             sdf_gt = sdf_data[:, 3]
-            rgb_bin_idx_gt = sdf_data[:, 4].long()
-            rgb_bin_gt = color_bin_soft_encodings_table[rgb_bin_idx_gt, :]
+            rgb_idx_gt = sdf_data[:, 4:7].long()
+            rgb_bin_idx_gt = rgb_to_bin(rgb_idx_gt[:, 0], rgb_idx_gt[:, 1], rgb_idx_gt[:, 2]).long()
 
             if xyz.dtype == torch.float64:
                 xyz = xyz.float()
+
+            rgb_bin_gt = torch.zeros((num_sdf_samples, 512))
+            rgb_bin_gt.requires_grad = False
+            rgb_bin_gt[idx_range, rgb_bin_idx_gt] += 0.7
+            for direction in dirs3d:
+                neighbor_bin_idx = rgb_to_bin(
+                    torch.clip(rgb_idx_gt[:, 0] + direction[0], 0, 7),
+                    torch.clip(rgb_idx_gt[:, 1] + direction[1], 0, 7),
+                    torch.clip(rgb_idx_gt[:, 2] + direction[2], 0, 7)
+                )
+                rgb_bin_gt[idx_range, neighbor_bin_idx] += 0.05
 
             if enforce_minmax:
                 sdf_gt = torch.clamp(sdf_gt, minT, maxT)

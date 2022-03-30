@@ -12,11 +12,16 @@ import deep_sdf
 import deep_sdf.workspace as ws
 
 
-def evaluate(experiment_directory, checkpoint, data_dir, max_meshes, split_filename=None, keep_normalized=False, source_name_surface=None):
+def evaluate(experiment_directory, checkpoint, max_meshes, data_dir=None, split_filename=None, keep_normalized=False, source_name_surface=None):
+
+    with open(os.path.join(experiment_directory, "specs.json"), "r") as f:
+        specs = json.load(f)
 
     if split_filename == None:
-        with open(os.path.join(experiment_directory, "specs.json"), "r") as f:
-            split_filename = json.load(f)["TrainSplit"]
+        split_filename = specs["TrainSplit"]
+
+    if data_dir == None:
+        data_dir = specs["DataSource"]
 
     with open(split_filename, "r") as f:
         split = json.load(f)
@@ -110,6 +115,7 @@ def evaluate(experiment_directory, checkpoint, data_dir, max_meshes, split_filen
     ) as f:
         f.write("shape, chamfer_dist, color_dist\n")
         f.write("MEAN, {}, {}\n".format(np.mean(chamfer_distances), np.mean(color_distances)))
+        f.write("MEDIAN, {}, {}\n".format(np.median(chamfer_distances), np.median(color_distances)))
         for result in chamfer_results:
             f.write("{}, {}, {}\n".format(result[0], result[1], result[2]))
 
@@ -136,7 +142,7 @@ if __name__ == "__main__":
         "--data",
         "-d",
         dest="data_source",
-        required=True,
+        default=None,
         help="The data source directory.",
     )
     arg_parser.add_argument(
@@ -178,8 +184,8 @@ if __name__ == "__main__":
     evaluate(
         args.experiment_directory,
         args.checkpoint,
-        args.data_source,
         int(args.max_meshes),
+        data_dir=args.data_source,
         split_filename=args.split_filename,
         keep_normalized=args.keep_normalized,
         source_name_surface=args.source_name_surface

@@ -5,9 +5,10 @@ import os
 import time
 
 
-experiment_directory = "experiments/nightstand3MSemiGlobal"
+experiment_directory = "experiments/nightstand3Mg4SG"
 epoch = "latest"
 mesh_id1 = "c2f29b88-e421-4b9c-ab06-50e9e83cf8a1"
+# mesh_id2 = "30d524b6-ad13-440f-a1ac-6d564213c2f7"
 mesh_id2 = "b6ec33de-c372-407c-b5b7-141436b02e7b"
 
 viewport_w = 900

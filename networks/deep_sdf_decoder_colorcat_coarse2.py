@@ -4,7 +4,10 @@
 import torch.nn as nn
 import torch
 import torch.nn.functional as F
+import torch.nn.init as init
+from torch.nn.parameter import Parameter
 import numpy as np
+import math
 
 
 def interpolate_trilinear(pts, features):
@@ -90,6 +93,55 @@ def interpolate_trilinear_alt(pts, features):
     return fxyz
 
 
+class LinearWithLipschitz(nn.Module):
+    __constants__ = ['in_features', 'out_features']
+    in_features: int
+    out_features: int
+    weight: torch.Tensor
+
+    def __init__(self, in_features: int, out_features: int, bias: bool = True, lipschitz_init_scale = 1.0,
+                 device=None, dtype=None) -> None:
+        factory_kwargs = {'device': device, 'dtype': dtype}
+        super(LinearWithLipschitz, self).__init__()
+        self.in_features = in_features
+        self.out_features = out_features
+        self.one = torch.Tensor([1.0]).cuda()
+        self.weight = Parameter(torch.empty((out_features, in_features), **factory_kwargs))
+        self.lipschitz_bound = Parameter(torch.empty(1))
+        self.lipschitz_init_scale = lipschitz_init_scale
+        if bias:
+            self.bias = Parameter(torch.empty(out_features, **factory_kwargs))
+        else:
+            self.register_parameter('bias', None)
+        self.reset_parameters()
+
+    def reset_parameters(self) -> None:
+        # Setting a=sqrt(5) in kaiming_uniform is the same as initializing with
+        # uniform(-1/sqrt(in_features), 1/sqrt(in_features)). For details, see
+        # https://github.com/pytorch/pytorch/issues/57109
+        init.kaiming_uniform_(self.weight, a=math.sqrt(5))
+        if self.bias is not None:
+            fan_in, _ = init._calculate_fan_in_and_fan_out(self.weight)
+            bound = 1 / math.sqrt(fan_in) if fan_in > 0 else 0
+            init.uniform_(self.bias, -bound, bound)
+        
+        init.constant_(
+            self.lipschitz_bound, 
+            self.lipschitz_init_scale * np.max(np.sum(np.abs(self.weight.detach().numpy()), axis=1))
+        )
+
+    def forward(self, input: torch.Tensor) -> torch.Tensor:
+        absrowsum = torch.sum(torch.abs(self.weight), axis=1)
+        scale = torch.minimum(self.one, self.lipschitz_bound / absrowsum)
+        weight_normalized = self.weight * scale[:, None] # scale each row
+        return F.linear(input, weight_normalized, self.bias)
+
+    def extra_repr(self) -> str:
+        return 'in_features={}, out_features={}, bias={}'.format(
+            self.in_features, self.out_features, self.bias is not None
+        )
+
+
 class Decoder(nn.Module):
     def __init__(
         self,
@@ -100,6 +152,8 @@ class Decoder(nn.Module):
         norm_layers=(),
         latent_in=(),
         weight_norm=False,
+        with_lipschitz=False,
+        lipschitz_init_scale=None,
         xyz_in_all=False,  # disabled
         use_tanh=False,  # unused - last layer is always tanh
         latent_dropout=False,
@@ -109,10 +163,12 @@ class Decoder(nn.Module):
         convt3d_dims=[512],
         convt3d_kernel_sizes=[2],
         convt3d_strides=[1],
+        xyz_scale=1.0,
+        use_leaky=False
     ):
         super(Decoder, self).__init__()
 
-        self.latent_size_partial = latent_size // 2
+        self.latent_size_partial = latent_size // 2 # todo: make extensible
 
         convt3d_dims = [self.latent_size_partial] + convt3d_dims
 
@@ -131,7 +187,7 @@ class Decoder(nn.Module):
 
         dims = [self.latent_size_partial + convt3d_dims[-1] + xyz_size] + dims + [1 + 512]
 
-        self.num_layers = len(dims)
+        self.num_layers = len(dims) # including input, hidden, and output layers
         self.norm_layers = norm_layers
         self.latent_in = latent_in
         self.latent_dropout = latent_dropout
@@ -140,9 +196,12 @@ class Decoder(nn.Module):
 
         self.xyz_in_all = xyz_in_all
         self.weight_norm = weight_norm
+        self.with_lipschitz = with_lipschitz
+
+        self.xyz_scale = xyz_scale
 
         self.use_fourier_features = use_fourier_features
-        if self.use_fourier_features:
+        if use_fourier_features:
             self.fourier_features_size = fourier_features_size
             gaussian_matrix = torch.normal(
                 0, fourier_features_std, size=(self.fourier_features_size, 3))
@@ -158,15 +217,17 @@ class Decoder(nn.Module):
                     out_dim -= self.fourier_features_size*2
             print(layer, out_dim)
 
+            lin = LinearWithLipschitz if with_lipschitz else nn.Linear
+            lin_kwargs = { "lipschitz_init_scale": lipschitz_init_scale } if lipschitz_init_scale is not None else {}
+
             if weight_norm and layer in self.norm_layers:
                 setattr(
                     self,
                     "lin" + str(layer),
-                    nn.utils.weight_norm(nn.Linear(dims[layer], out_dim)),
+                    nn.utils.weight_norm(lin(dims[layer], out_dim, **lin_kwargs)),
                 )
             else:
-                setattr(self, "lin" + str(layer),
-                        nn.Linear(dims[layer], out_dim))
+                setattr(self, "lin" + str(layer), lin(dims[layer], out_dim))
 
             if (
                 (not weight_norm)
@@ -178,8 +239,11 @@ class Decoder(nn.Module):
         # self.use_tanh = use_tanh
         # if use_tanh:
         #     self.tanh = nn.Tanh()
-        self.relu = nn.ReLU()
         self.leaky = nn.LeakyReLU(negative_slope=0.01)
+        if use_leaky:
+            self.relu = self.leaky
+        else:
+            self.relu = nn.ReLU()
 
         self.dropout_prob = dropout_prob
         self.dropout = dropout
@@ -214,6 +278,7 @@ class Decoder(nn.Module):
         if self.use_fourier_features:
             xyz = (2.*np.pi*xyz) @ torch.t(self.gaussian_matrix).cuda()
             xyz = torch.cat((torch.sin(xyz), torch.cos(xyz)), -1)
+            xyz *= self.xyz_scale
 
             input = torch.cat((latent_vecs, xyz), 1)
 
@@ -224,6 +289,7 @@ class Decoder(nn.Module):
             else:
                 x = input
         else:
+            xyz *= self.xyz_scale
             if input.shape[1] > 3 and self.latent_dropout:
                 latent_vecs = F.dropout(
                     latent_vecs, p=0.2, training=self.training)
@@ -285,6 +351,8 @@ class Decoder(nn.Module):
             xyz = (2.*np.pi*xyz) @ torch.t(self.gaussian_matrix).cuda()
             xyz = torch.cat((torch.sin(xyz), torch.cos(xyz)), -1)
 
+        xyz *= self.xyz_scale
+
         if self.latent_dropout:
             latent_vec = F.dropout(latent_vec, p=0.2, training=self.training)
 
@@ -319,3 +387,10 @@ class Decoder(nn.Module):
         color_dist = F.softmax(x[:, 1:], dim=1)
 
         return sdf, color_dist
+    
+    def get_lipschitz_bounds(self):
+        bounds = []
+        for layer in range(0, self.num_layers - 1):
+            lin = getattr(self, "lin" + str(layer))
+            bounds.append(lin.lipschitz_bound)
+        return bounds
