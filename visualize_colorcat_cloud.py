@@ -10,9 +10,9 @@ color_bins_path = 'color_bins/nightstand/clusters.npz'
 color_bins_key = 'average'
 annealing_temperature = 0.38 # 1.0 = mean, 0.01 = mode
 # aa4714b2-e1f4-40b9-b680-5ee2d82c920b a2a8b471-48b3-4dd9-9ffd-dcf66d72dd58 192ac441-48b7-4559-bc02-7c532171b531 0ecff51f-5f8e-4ac7-b28a-d98d19446ff2
-sdf_path = 'data/SdfSamples/3D-FUTURE-model_manifold/category_2/f3a8453b-a69d-4227-a501-97dd702bbbe7.npz'
+sdf_path = 'data/SdfSamples/3D-FUTURE-model_manifold/category_2/aa4714b2-e1f4-40b9-b680-5ee2d82c920b.npz'
 # sdf_path = 'data/SdfSamples/3D-FUTURE-model_manifold/category_13/81aec6cd-34d7-4619-81e6-56bd1cdc1265.npz'
-sdf_abs = 0.01
+sdf_abs = 0.02
 sdf_lower = -0.01
 sdf_upper = 0.01
 

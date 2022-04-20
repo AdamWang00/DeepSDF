@@ -10,6 +10,9 @@ import torch
 import deep_sdf
 import deep_sdf.workspace as ws
 
+from latentgan_reverse.config import *
+from latentgan_reverse.model import Generator, GeneratorReverse
+
 
 BBOX_FACTOR = 1.02  # samples from BBOX_FACTOR times the bounding box size
 LEVEL_SET = 0.0 # SDF value used to determine surface level set
@@ -63,7 +66,18 @@ def code_to_mesh(experiment_directory, checkpoint, max_meshes, keep_normalized=F
 
     print(len(instance_filenames), " vs ", len(latent_vectors))
 
+    ae_encoder = GeneratorReverse(latent_size, hidden_dims, z_dim)
+    encoder_path = os.path.join("latentgan_reverse/experiments", model_name, model_params_subdir)
+    ae_encoder.load_model(encoder_path, epoch_load)
+    ae_encoder = ae_encoder.eval().cuda()
+
+    ae_decoder = Generator(z_dim, hidden_dims_g, latent_size)
+    ae_decoder.load_state_dict(torch.load(generator_params_path))
+    ae_decoder = ae_decoder.eval().cuda()
+
     for i, latent_vector in enumerate(latent_vectors):
+        latent_vector = ae_decoder(ae_encoder(latent_vector.cuda()))
+
         if i == max_meshes:
             break
 
@@ -76,7 +90,7 @@ def code_to_mesh(experiment_directory, checkpoint, max_meshes, keep_normalized=F
 
         mesh_dir = os.path.join(
             experiment_directory,
-            ws.training_meshes_subdir,
+            ws.training_meshes_subdir+"2",
             str(saved_model_epoch),
             dataset_name,
             class_name,

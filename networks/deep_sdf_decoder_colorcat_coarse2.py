@@ -227,7 +227,7 @@ class Decoder(nn.Module):
                     nn.utils.weight_norm(lin(dims[layer], out_dim, **lin_kwargs)),
                 )
             else:
-                setattr(self, "lin" + str(layer), lin(dims[layer], out_dim))
+                setattr(self, "lin" + str(layer), lin(dims[layer], out_dim, **lin_kwargs))
 
             if (
                 (not weight_norm)

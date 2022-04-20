@@ -8,9 +8,9 @@
 # python generate_training_meshes_color.py --cat -n -m 32 -c 1000 -e experiments/nightstand3Ma
 # python evaluate_color.py -d ./data -n -m 32 -c 1000 -e experiments/nightstand3Ma --name_surface 3D-FUTURE-model
 
-python train_deep_sdf_colorcat_coarse.py -e experiments/nightstand4Mf
-python generate_training_meshes_colorcat.py -n -m 32 -c 1000 -e experiments/nightstand4Mf
-python evaluate_color.py -n -m 32 -c 1000 -e experiments/nightstand4Mf --name_surface 3D-FUTURE-model
+python train_deep_sdf_colorcat_coarse.py -e experiments/nightstand4
+python generate_training_meshes_colorcat.py -n -m 32 -c 1000 -e experiments/nightstand4
+python evaluate_color.py -n -m 32 -c 1000 -e experiments/nightstand4 --name_surface 3D-FUTURE-model
 
 # for dir in experiments/nightstand3*/; do
 #     python evaluate_color.py -d ./data -n -m 32 -c 1000 -e "$dir" --name_surface 3D-FUTURE-model

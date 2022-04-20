@@ -436,6 +436,10 @@ def main_function(experiment_directory, continue_from, load_ram):
     timing_log = []
     param_mag_log = {}
 
+    LOG_LIPSCHITZ_BOUNDS = True
+    if LOG_LIPSCHITZ_BOUNDS:
+        lipschitz_bounds_log = []
+
     start_epoch = 1
 
     if continue_from is not None:
@@ -533,7 +537,6 @@ def main_function(experiment_directory, continue_from, load_ram):
             sdf_data = sdf_data.reshape(-1, 5)  # x, y, z, sdf_gt, color_bin_idx
 
             num_sdf_samples = sdf_data.shape[0]
-            idx_range = torch.arange(num_sdf_samples)
 
             sdf_data.requires_grad = False
 
@@ -560,7 +563,7 @@ def main_function(experiment_directory, continue_from, load_ram):
 
             optimizer_all.zero_grad()
 
-            for i in range(batch_split):
+            for i in range(batch_split): # batch_split = scene_per_batch
                 batch_vec = lat_vecs(indices[i]).cuda()
 
                 # forward pass
@@ -578,19 +581,6 @@ def main_function(experiment_directory, continue_from, load_ram):
                                    color_loss_sdf_threshold, 1, 0).unsqueeze(1)
 
                 batch_rgb_bin_gt = torch.mul(batch_rgb_bin_gt, mask)
-
-                # if i == 0:
-                    # print(torch.min(pred_rgb_bins).item(), torch.max(pred_rgb_bins).item(), torch.min(torch.log(pred_rgb_bins)).item(), torch.max(torch.log(pred_rgb_bins)).item())
-                    # nonzero = torch.nonzero(batch_rgb_bin_gt)
-                    # n0, n1 = nonzero[0:10, 0], nonzero[0:10, 1]
-                    # print("a", batch_rgb_bin_gt.shape)
-                    # print("b", torch.log(pred_rgb_bins).shape)
-                    # print("c", torch.mul(batch_rgb_bin_gt, torch.log(pred_rgb_bins)).shape)
-                    # print("d", torch.sum(torch.mul(batch_rgb_bin_gt, torch.log(pred_rgb_bins)), 1).shape)
-                    # print("e", torch.mul(rgb_bin_weights[batch_rgb_bin_idx_gt],
-                    #     torch.sum(torch.mul(batch_rgb_bin_gt, torch.log(pred_rgb_bins)), 1)).shape)
-                    # print("f", torch.sum(torch.mul(rgb_bin_weights[batch_rgb_bin_idx_gt],
-                    #     torch.sum(torch.mul(batch_rgb_bin_gt, torch.log(pred_rgb_bins)), 1))).shape)
 
                 loss_sdf = loss_l1(pred_sdf, batch_sdf_gt) / num_sdf_samples
 
@@ -638,10 +628,18 @@ def main_function(experiment_directory, continue_from, load_ram):
 
                 torch.nn.utils.clip_grad_norm_(decoder.parameters(), grad_clip)
 
+            if with_lipschitz and LOG_LIPSCHITZ_BOUNDS:
+                temp = [lb.item() for lb in lipschitz_bounds]
+
             optimizer_all.step()
+
+            if with_lipschitz and LOG_LIPSCHITZ_BOUNDS:
+                print([lipschitz_bounds[i].item() - temp[i] for i in range(len(temp))])
         
-        if with_lipschitz:
-            print([lb.item() for lb in lipschitz_bounds])
+        if with_lipschitz and LOG_LIPSCHITZ_BOUNDS:
+            lipschitz_bounds = decoder.get_lipschitz_bounds()
+            lipschitz_bounds = [lb.item() for lb in lipschitz_bounds]
+            lipschitz_bounds_log.append(lipschitz_bounds)
 
         end = time.time()
 
@@ -675,6 +673,8 @@ def main_function(experiment_directory, continue_from, load_ram):
                 epoch,
             )
 
+            if with_lipschitz and LOG_LIPSCHITZ_BOUNDS:
+                np.save(os.path.join(experiment_directory, "LipschitzBoundLogs"), np.array(lipschitz_bounds_log))
 
 if __name__ == "__main__":
 

@@ -5,20 +5,23 @@ import torch
 import deep_sdf
 import deep_sdf.workspace as ws
 
+from latentgan_reverse.config import *
+from latentgan_reverse.model import Generator, GeneratorReverse
 
-experiment_directory = "experiments/nightstand3Mg2SG"
-epoch = "latest"
+
+experiment_directory = f"experiments/{deepsdf_model_name}"
+epoch = str(deepsdf_epoch_load)
 mesh_id1 = "c2f29b88-e421-4b9c-ab06-50e9e83cf8a1"
 mesh_id2 = "30d524b6-ad13-440f-a1ac-6d564213c2f7"
 # mesh_id2 = "b6ec33de-c372-407c-b5b7-141436b02e7b"
 
-num_interpolations = 32
-bbox_factor = 1.02  # samples from BBOX_FACTOR times the bounding box size
-level_set = 0.0 # SDF value used to determine surface level set
-sampling_dim = 256
-is_colorcat = True
+NUM_INTERPOLATIONS = 32
+BBOX_FACTOR = 1.02  # samples from BBOX_FACTOR times the bounding box size
+LEVEL_SET = 0.0 # SDF value used to determine surface level set
+SAMPLING_DIM = 256 # samples NxNxN points inside the bounding box
+COLOR_ANNEALING_TEMPERATURE = 0.38 # 1.0 = mean, 0.01 = mode
 
-if num_interpolations < 2:
+if NUM_INTERPOLATIONS < 2:
     raise Exception("number of interpolations must be at least 2")
 
 specs_filename = os.path.join(experiment_directory, "specs.json")
@@ -80,9 +83,21 @@ except ValueError:
 latent_vector1 = latent_vectors[mesh_index1]
 latent_vector2 = latent_vectors[mesh_index2]
 
+ae_encoder = GeneratorReverse(latent_size, hidden_dims, z_dim)
+encoder_path = os.path.join("latentgan_reverse/experiments", model_name, model_params_subdir)
+ae_encoder.load_model(encoder_path, epoch_load)
+ae_encoder = ae_encoder.eval().cuda()
+
+ae_decoder = Generator(z_dim, hidden_dims_g, latent_size)
+ae_decoder.load_state_dict(torch.load(generator_params_path))
+ae_decoder = ae_decoder.eval().cuda()
+
+latent_vector1 = ae_encoder(latent_vector1.unsqueeze(0).cuda()).squeeze()
+latent_vector2 = ae_encoder(latent_vector2.unsqueeze(0).cuda()).squeeze()
+
 mesh_dir = os.path.join(
     experiment_directory,
-    'Interpolations',
+    'Interpolations2',
     epoch,
     mesh_id1 + '_' + mesh_id2
 )
@@ -90,23 +105,26 @@ mesh_dir = os.path.join(
 if not os.path.isdir(mesh_dir):
     os.makedirs(mesh_dir)
 
-for i in range(num_interpolations):
-    w = 1 - (i / (num_interpolations - 1)) # weight on latent_vector1
+for i in range(NUM_INTERPOLATIONS):
+    w = 1 - (i / (NUM_INTERPOLATIONS - 1)) # weight on latent_vector1
     latent_vector = latent_vector1 * w + latent_vector2 * (1-w)
+    latent_vector = ae_decoder(latent_vector.unsqueeze(0)).squeeze()
 
-    print(f'interpolation {i+1} of {num_interpolations} (w={w})')
+    print(f'interpolation {i+1} of {NUM_INTERPOLATIONS} (w={w})')
     mesh_filename = os.path.join(mesh_dir, str(i+1))
 
     with torch.no_grad():
-        deep_sdf.mesh_color.create_mesh(
+        deep_sdf.mesh_colorcat.create_mesh(
             decoder,
             latent_vector,
             mesh_filename,
+            specs["ColorBinsPath"],
+            specs["ColorBinsKey"],
             max_batch=int(2 ** 17),
             offset=None,
             scale=None,
-            N=sampling_dim,
-            bbox_factor=bbox_factor,
-            level_set=level_set,
-            is_colorcat=is_colorcat,
+            N=SAMPLING_DIM,
+            bbox_factor=BBOX_FACTOR,
+            level_set=LEVEL_SET,
+            annealing_temperature=COLOR_ANNEALING_TEMPERATURE,
         )
