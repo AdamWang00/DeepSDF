@@ -1,7 +1,7 @@
 import json
 import os
 
-model_name = "nightstand3"
+model_name = "nightstand4"
 epoch_load = "1000"
 print("latentgan_reverse", model_name, epoch_load)
 

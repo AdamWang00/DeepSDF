@@ -20,11 +20,11 @@ model_generator_reverse.load_model(model_generator_reverse_path, epoch_load)
 model_generator_reverse = model_generator_reverse.eval().cuda()
 
 z_list = np.empty((2 * num_codes, latent_size))
-z_list[num_codes:] = model_generator(model_generator_reverse(model_latent_data.cuda())).detach().cpu()
 z_list[:num_codes] = model_latent_data
+z_list[num_codes:] = model_generator(model_generator_reverse(model_latent_data.cuda())).detach().cpu()
 
 tsne = TSNE(n_components=2)
 transformed = tsne.fit_transform(z_list)
-plt.scatter(transformed[:num_codes, 0], transformed[:num_codes, 1], alpha=0.5, color="r")
-plt.scatter(transformed[num_codes:, 0], transformed[num_codes:, 1], alpha=0.5, color="g")
+plt.scatter(transformed[:num_codes, 0], transformed[:num_codes, 1], alpha=0.5, color="g")
+plt.scatter(transformed[num_codes:, 0], transformed[num_codes:, 1], alpha=0.5, color="r")
 plt.savefig(f"tsneAE_{model_name}.png")

@@ -6,7 +6,7 @@ import deep_sdf
 import deep_sdf.workspace as ws
 
 from latentgan_reverse.config import *
-from latentgan_reverse.model import GeneratorAE
+from latentgan_reverse.model import Generator, GeneratorReverse
 
 
 experiment_directory = f"experiments/{deepsdf_model_name}"
@@ -83,11 +83,17 @@ except ValueError:
 latent_vector1 = latent_vectors[mesh_index1]
 latent_vector2 = latent_vectors[mesh_index2]
 
-generator_ae = GeneratorAE()
-generator_ae_params_dir = os.path.join("latentgan_reverse/experiments", model_name, model_params_subdir)
-generator_ae.load_model(generator_ae_params_dir, epoch_load)
-latent_vector1 = generator_ae.encoder(latent_vector1.unsqueeze(0).cuda()).squeeze()
-latent_vector2 = generator_ae.encoder(latent_vector2.unsqueeze(0).cuda()).squeeze()
+ae_encoder = GeneratorReverse(latent_size, hidden_dims, z_dim)
+encoder_path = os.path.join("latentgan_reverse/experiments", model_name, model_params_subdir)
+ae_encoder.load_model(encoder_path, epoch_load)
+ae_encoder = ae_encoder.eval().cuda()
+
+ae_decoder = Generator(z_dim, hidden_dims_g, latent_size)
+ae_decoder.load_state_dict(torch.load(generator_params_path))
+ae_decoder = ae_decoder.eval().cuda()
+
+latent_vector1 = ae_encoder(latent_vector1.unsqueeze(0).cuda()).squeeze()
+latent_vector2 = ae_encoder(latent_vector2.unsqueeze(0).cuda()).squeeze()
 
 mesh_dir = os.path.join(
     experiment_directory,
@@ -102,7 +108,7 @@ if not os.path.isdir(mesh_dir):
 for i in range(NUM_INTERPOLATIONS):
     w = 1 - (i / (NUM_INTERPOLATIONS - 1)) # weight on latent_vector1
     latent_vector = latent_vector1 * w + latent_vector2 * (1-w)
-    latent_vector = generator_ae.decoder(latent_vector.unsqueeze(0)).squeeze()
+    latent_vector = ae_decoder(latent_vector.unsqueeze(0)).squeeze()
 
     print(f'interpolation {i+1} of {NUM_INTERPOLATIONS} (w={w})')
     mesh_filename = os.path.join(mesh_dir, str(i+1))
