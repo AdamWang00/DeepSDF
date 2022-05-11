@@ -164,13 +164,14 @@ class Decoder(nn.Module):
         convt3d_kernel_sizes=[2],
         convt3d_strides=[1],
         xyz_scale=1.0,
-        use_leaky=False
+        use_leaky=False,
+        latent_size_global=None
     ):
         super(Decoder, self).__init__()
 
-        self.latent_size_partial = latent_size // 2 # todo: make extensible
+        self.latent_size_global = latent_size // 2 if latent_size_global is None else latent_size_global
 
-        convt3d_dims = [self.latent_size_partial] + convt3d_dims
+        convt3d_dims = [latent_size - self.latent_size_global] + convt3d_dims
 
         self.conv3d_t_num_layers = len(convt3d_dims)
         for layer in range(self.conv3d_t_num_layers - 1):
@@ -185,7 +186,7 @@ class Decoder(nn.Module):
         else:
             xyz_size = 3
 
-        dims = [self.latent_size_partial + convt3d_dims[-1] + xyz_size] + dims + [1 + 512]
+        dims = [self.latent_size_global + convt3d_dims[-1] + xyz_size] + dims + [1 + 512]
 
         self.num_layers = len(dims) # including input, hidden, and output layers
         self.norm_layers = norm_layers
@@ -257,8 +258,8 @@ class Decoder(nn.Module):
         xyz = input[:, -3:]
         latent_vecs = input[:, :-3]
 
-        latent_vecs_global = latent_vecs[:, 0:self.latent_size_partial]
-        latent_vecs_grid = latent_vecs[:, self.latent_size_partial:]
+        latent_vecs_global = latent_vecs[:, 0:self.latent_size_global]
+        latent_vecs_grid = latent_vecs[:, self.latent_size_global:]
 
         latent_vecs_grid = latent_vecs_grid.view(
             latent_vecs_grid.shape[0], latent_vecs_grid.shape[1], 1, 1, 1)
@@ -330,8 +331,8 @@ class Decoder(nn.Module):
     # latent_vecs: [L]
 
     def forward_alt(self, xyz, latent_vec):
-        latent_vec_global = latent_vec[0:self.latent_size_partial]
-        latent_vec_grid = latent_vec[self.latent_size_partial:]
+        latent_vec_global = latent_vec[0:self.latent_size_global]
+        latent_vec_grid = latent_vec[self.latent_size_global:]
 
         latent_vec_grid = latent_vec_grid.view(1, latent_vec_grid.shape[0], 1, 1, 1)
         for layer in range(self.conv3d_t_num_layers - 1):
@@ -394,3 +395,44 @@ class Decoder(nn.Module):
             lin = getattr(self, "lin" + str(layer))
             bounds.append(lin.lipschitz_bound)
         return bounds
+
+
+class Discriminator(nn.Module): # pointnet
+    def __init__(
+        self,
+        point_size,
+        dims_conv,
+        feat_size,
+        dims_lin,
+        use_leaky=False,
+    ):
+        super(Discriminator, self).__init__()
+
+        modules_conv = []
+        dims_conv = [point_size] + dims_conv
+        for i in range(len(dims_conv) - 1):
+            modules_conv.append(nn.Conv1d(dims_conv[i], dims_conv[i + 1], 1))
+            if use_leaky:
+                modules_conv.append(nn.LeakyReLU(0.2, True))
+            else:
+                modules_conv.append(nn.ReLU(True))
+        modules_conv.append(nn.Conv1d(dims_conv[-1], feat_size, 1))
+        self.modules_conv = nn.Sequential(*modules_conv)
+
+        modules_lin = []
+        dims_lin = [feat_size] + dims_lin
+        for i in range(len(dims_lin) - 1):
+            modules_lin.append(nn.Linear(dims_lin[i], dims_lin[i + 1]))
+            if use_leaky:
+                modules_lin.append(nn.LeakyReLU(0.2, True))
+            else:
+                modules_lin.append(nn.ReLU(True))
+        modules_lin.append(nn.Linear(dims_lin[-1], 1))
+        self.modules_lin = nn.Sequential(*modules_lin)
+        
+
+    def forward(self, x): # x: [batch_size, point_size, num_points]
+        x = self.modules_conv(x)
+        x, _ = torch.max(x, 2) # (after max) x: [batch_size, feat_size]
+        x = self.modules_lin(x)
+        return x

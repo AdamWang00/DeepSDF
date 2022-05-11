@@ -1,12 +1,13 @@
 import json
 import os
 
-model_name = "nightstand4"
+model_name = "nightstand6"
 epoch_load = "1000"
 print("latentgan_reverse", model_name, epoch_load)
 
 save_per_epochs = 1000
 
+experiments_dir = "/home/awang156/DeepSDF/latentgan_reverse/experiments"
 model_params_subdir = "ModelParameters"
 model_generations_subdir = "Generations"
 
@@ -15,7 +16,7 @@ params_history = {
         "gan_model_name": "nightstand1",
         "gan_iter_load": 200000,
         "num_training_codes": 100000,
-        "epochs": 1001,
+        "epochs": 1000,
         "batch_size": 64,
         "learning_rate": 0.0001,
         "hidden_dims": [512, 512, 512, 512],
@@ -24,7 +25,7 @@ params_history = {
         "gan_model_name": "nightstand1",
         "gan_iter_load": 200000,
         "num_training_codes": 100000,
-        "epochs": 1001,
+        "epochs": 1000,
         "batch_size": 64,
         "learning_rate": 0.00003,
         "hidden_dims": [512, 512, 512, 512],
@@ -33,7 +34,7 @@ params_history = {
         "gan_model_name": "nightstand1",
         "gan_iter_load": 200000,
         "num_training_codes": 100000,
-        "epochs": 1001,
+        "epochs": 1000,
         "batch_size": 64,
         "learning_rate": 0.0003,
         "hidden_dims": [512, 512, 512, 512],
@@ -42,9 +43,27 @@ params_history = {
         "gan_model_name": "nightstand1",
         "gan_iter_load": 200000,
         "num_training_codes": 100000,
-        "epochs": 1001,
+        "epochs": 1000,
         "batch_size": 64,
         "learning_rate": 0.001,
+        "hidden_dims": [512, 512, 512, 512],
+    },
+    "nightstand5": { # detach = False
+        "gan_model_name": "nightstand1",
+        "gan_iter_load": 200000,
+        "num_training_codes": 100000,
+        "epochs": 1000,
+        "batch_size": 64,
+        "learning_rate": 0.0001,
+        "hidden_dims": [512, 512, 512, 512],
+    },
+    "nightstand6": { # detach = True
+        "gan_model_name": "nightstand1",
+        "gan_iter_load": 200000,
+        "num_training_codes": 100000,
+        "epochs": 1000,
+        "batch_size": 64,
+        "learning_rate": 0.0001,
         "hidden_dims": [512, 512, 512, 512],
     },
 }

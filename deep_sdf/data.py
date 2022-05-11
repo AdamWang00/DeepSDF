@@ -124,8 +124,6 @@ class SDFSamples(torch.utils.data.Dataset):
         split,
         subsample,
         load_ram=False,
-        print_filename=False,
-        num_files=1000000,
     ):
         self.subsample = subsample
 

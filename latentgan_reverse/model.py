@@ -40,7 +40,7 @@ class GeneratorReverse(torch.nn.Module):
         modules.append(nn.Linear(dims[-1], z_dim))
         self.main_module = nn.Sequential(*modules)
 
-        self.save_dir = os.path.join("experiments", model_name, model_params_subdir)
+        self.save_dir = os.path.join(experiments_dir, model_name, model_params_subdir)
         if not os.path.exists(self.save_dir):
             os.makedirs(self.save_dir)
 
@@ -79,7 +79,7 @@ class GeneratorReverse(torch.nn.Module):
                     {
                         "loss": losses,
                     },
-                    os.path.join("experiments", model_name, "Logs.pth")
+                    os.path.join(experiments_dir, model_name, "Logs.pth")
                 )
 
         t_end = t.time()
@@ -92,7 +92,48 @@ class GeneratorReverse(torch.nn.Module):
             {
                 "loss": losses,
             },
-            os.path.join("experiments", model_name, "Logs.pth")
+            os.path.join(experiments_dir, model_name, "Logs.pth")
+        )
+
+    
+    def train_yield(self, epochs, train_loader):
+        t_begin = t.time()
+
+        losses = []
+        for epoch in range(1, epochs + 1):
+            print("Epoch", epoch)
+            for z, codes in train_loader:
+                z = z.cuda()
+                codes = codes.cuda()
+                self.zero_grad()
+                pred_z = self.forward(codes)
+                loss = F.mse_loss(pred_z, z)
+                loss.backward()
+                self.optimizer.step()
+                losses.append(loss.item())
+
+            if epoch % save_per_epochs == 0:
+                self.save_model(epoch)
+                torch.save(
+                    {
+                        "loss": losses,
+                    },
+                    os.path.join(experiments_dir, model_name, "Logs.pth")
+                )
+            
+            yield
+
+        t_end = t.time()
+        print('Time of training: {}'.format((t_end - t_begin)))
+
+        # Save the trained parameters
+        self.save_model("latest")
+
+        torch.save(
+            {
+                "loss": losses,
+            },
+            os.path.join(experiments_dir, model_name, "Logs.pth")
         )
 
 

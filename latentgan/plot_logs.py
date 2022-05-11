@@ -32,4 +32,4 @@ ax.plot(
 
 ax.grid()
 # plt.show()
-plt.savefig("logs.png")
+plt.savefig(f"logs_{model_name}.png")

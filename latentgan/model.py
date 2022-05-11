@@ -49,7 +49,7 @@ class Discriminator(torch.nn.Module):
 
 class WGAN_GP(object):
     def __init__(self):
-        self.save_dir = os.path.join("experiments", model_name, model_params_subdir)
+        self.save_dir = os.path.join(experiments_dir, model_name, model_params_subdir)
         if not os.path.exists(self.save_dir):
             os.makedirs(self.save_dir)
         self.G = Generator(z_dim, hidden_dims_g, latent_size).cuda()
@@ -144,7 +144,7 @@ class WGAN_GP(object):
                         "loss_d": losses_d,
                         "loss_g": losses_g,
                     },
-                    os.path.join("experiments", model_name, "Logs.pth")
+                    os.path.join(experiments_dir, model_name, "Logs.pth")
                 )
 
         self.t_end = t.time()
@@ -158,7 +158,98 @@ class WGAN_GP(object):
                 "loss_d": losses_d,
                 "loss_g": losses_g,
             },
-            os.path.join("experiments", model_name, "Logs.pth")
+            os.path.join(experiments_dir, model_name, "Logs.pth")
+        )
+
+
+    def train_yield(self, generator_iters, train_loader):
+        self.t_begin = t.time()
+
+        # Now batches are callable self.data.next()
+        self.data = self.get_infinite_batches(train_loader)
+
+        one = torch.tensor(1, dtype=torch.float)
+        mone = one * -1
+
+        losses_d = []
+        losses_g = []
+        for g_iter in range(1, generator_iters + 1):
+            # Train Discriminator
+            for p in self.D.parameters():
+                p.requires_grad = True
+
+            d_loss_total = 0
+            for d_iter in range(self.critic_iter):
+                self.D.zero_grad()
+
+                real_latent_codes = self.data.__next__().cuda()
+
+                d_loss_real = self.D(real_latent_codes)
+                d_loss_real = d_loss_real.mean()
+                d_loss_real.backward(mone)
+
+                z = torch.randn(self.batch_size, z_dim).cuda()
+
+                fake_latent_codes = self.G(z)
+                d_loss_fake = self.D(fake_latent_codes)
+                d_loss_fake = d_loss_fake.mean()
+                d_loss_fake.backward(one)
+
+                gradient_penalty = self.calculate_gradient_penalty(real_latent_codes, fake_latent_codes)
+                gradient_penalty.backward()
+
+                d_loss = d_loss_fake - d_loss_real + gradient_penalty
+                # Wasserstein_D = d_loss_real - d_loss_fake
+                self.d_optimizer.step()
+                # print(f'  Discriminator iteration: {d_iter + 1}/{self.critic_iter}, loss: {d_loss}')
+                d_loss_total += d_loss.item()
+
+            losses_d.append(d_loss_total)
+
+            # Train Generator
+            for p in self.D.parameters():
+                p.requires_grad = False # to avoid update
+
+            self.G.zero_grad()
+
+            z = torch.randn(self.batch_size, z_dim).cuda()
+
+            fake_latent_codes = self.G(z)
+            g_loss = self.D(fake_latent_codes)
+            g_loss = g_loss.mean()
+            g_loss.backward(mone)
+
+            self.g_optimizer.step()
+
+            # print(f'Generator iteration: {g_iter}/{generator_iters}, g_loss: {g_loss}')
+            losses_g.append(g_loss)
+
+            print(f'Generator iteration: {g_iter}/{generator_iters}, g_loss: {g_loss}, d_loss: {d_loss_total}')
+
+            if (g_iter) % SAVE_PER_ITERS == 0:
+                self.save_model(g_iter)
+                torch.save(
+                    {
+                        "loss_d": losses_d,
+                        "loss_g": losses_g,
+                    },
+                    os.path.join(experiments_dir, model_name, "Logs.pth")
+                )
+
+            yield
+
+        self.t_end = t.time()
+        print('Time of training: {}'.format((self.t_end - self.t_begin)))
+
+        # Save the trained parameters
+        self.save_model("latest")
+
+        torch.save(
+            {
+                "loss_d": losses_d,
+                "loss_g": losses_g,
+            },
+            os.path.join(experiments_dir, model_name, "Logs.pth")
         )
 
 

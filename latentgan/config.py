@@ -1,17 +1,42 @@
 import json
 import os
 
-model_name = "nightstand1"
+model_name = "nightstand3"
 iter_load = "200000"
 print("latentgan", model_name, iter_load)
 
 save_per_iters = 50000
 
+experiments_dir = "/home/awang156/DeepSDF/latentgan/experiments"
 model_params_subdir = "ModelParameters"
 model_generations_subdir = "Generations"
 
 params_history = {
     "nightstand1": {
+        "deepsdf_model_name": "nightstand4",
+        "deepsdf_epoch_load": 1000,
+        "generator_iters": 200000,
+        "batch_size": 64,
+        "learning_rate_g": 0.0001,
+        "learning_rate_d": 0.0001,
+        "gp_lambda": 10,
+        "z_dim": 256,
+        "hidden_dims_g": [512, 512, 512, 512],
+        "hidden_dims_d": [512, 512, 512, 512]
+    },
+    "nightstand2": {
+        "deepsdf_model_name": "nightstand4",
+        "deepsdf_epoch_load": 1000,
+        "generator_iters": 200000,
+        "batch_size": 64,
+        "learning_rate_g": 0.0001,
+        "learning_rate_d": 0.0001,
+        "gp_lambda": 10,
+        "z_dim": 256,
+        "hidden_dims_g": [512, 512, 512, 512],
+        "hidden_dims_d": [512, 512, 512, 512]
+    },
+    "nightstand3": {
         "deepsdf_model_name": "nightstand4",
         "deepsdf_epoch_load": 1000,
         "generator_iters": 200000,

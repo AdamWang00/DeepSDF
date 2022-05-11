@@ -151,8 +151,6 @@ def preprocess_color(model_path, texture_path, surface_samples_path, surface_sam
         _, sdf_pos_indices = color_bins_kdtree.query(sdf_pos_lab)
         _, sdf_neg_indices = color_bins_kdtree.query(sdf_neg_lab)
 
-        print(sdf_pos_indices[0:5], color_bins_lab[sdf_pos_indices[0:5]], sdf_pos_lab[0:5])
-
         sdf_pos = np.concatenate((
             sdf_pos[:, 0:4],
             np.expand_dims(sdf_pos_indices, 1),

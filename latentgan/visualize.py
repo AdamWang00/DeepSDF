@@ -5,7 +5,7 @@ from latentgan.model import WGAN_GP
 from latentgan.dataset import ModelLatentDataset
 from latentgan.config import *
 
-num_examples = 10000
+num_examples = 1000
 
 model_latent_data = ModelLatentDataset(deepsdf_model_codes_path).data
 num_codes = model_latent_data.shape[0]

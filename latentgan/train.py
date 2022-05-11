@@ -1,5 +1,3 @@
-import os
-import torch
 import torch.utils.data as data_utils
 from latentgan.model import WGAN_GP
 from latentgan.dataset import ModelLatentDataset
