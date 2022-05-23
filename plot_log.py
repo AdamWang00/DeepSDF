@@ -15,7 +15,7 @@ def running_mean(x, N):
     return (cumsum[N:] - cumsum[:-N]) / float(N)
 
 
-def load_logs(experiment_directory, type, is_color, is_lipschitz, save=False):
+def load_logs(experiment_directory, type, is_color, is_lipschitz, is_disc, save=False):
 
     logs = torch.load(os.path.join(experiment_directory, ws.logs_filename))
 
@@ -58,6 +58,13 @@ def load_logs(experiment_directory, type, is_color, is_lipschitz, save=False):
             to_plot.extend([
                 np.arange(num_iters) / iters_per_epoch,
                 logs["lipschitz_loss"],
+                "#378805"
+            ])
+        
+        if is_disc:
+            to_plot.extend([
+                np.arange(num_iters) / iters_per_epoch,
+                logs["disc_loss_log"],
                 "#378805"
             ])
 
@@ -117,6 +124,7 @@ if __name__ == "__main__":
     arg_parser.add_argument("--type", "-t", dest="type", default="loss")
     arg_parser.add_argument("--color", "-c", dest="is_color", default=False, action="store_true")
     arg_parser.add_argument("--lipschitz", "-l", dest="is_lipschitz", default=False, action="store_true")
+    arg_parser.add_argument("--disc", "-d", dest="is_disc", default=False, action="store_true")
     arg_parser.add_argument("--save", "-s", dest="save", default=False, action="store_true")
 
     deep_sdf.add_common_args(arg_parser)
@@ -125,4 +133,4 @@ if __name__ == "__main__":
 
     deep_sdf.configure_logging(args)
 
-    load_logs(args.experiment_directory, args.type, args.is_color, args.is_lipschitz, save=args.save)
+    load_logs(args.experiment_directory, args.type, args.is_color, args.is_lipschitz, args.is_disc, save=args.save)

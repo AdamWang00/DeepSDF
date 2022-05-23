@@ -35,7 +35,7 @@ def load_experiment_specifications(experiment_directory):
     return json.load(open(filename))
 
 
-def load_model_parameters(experiment_directory, checkpoint, decoder):
+def load_model_parameters(experiment_directory, checkpoint, decoder, discriminator=None):
 
     filename = os.path.join(
         experiment_directory, model_params_subdir, checkpoint + ".pth"
@@ -47,6 +47,8 @@ def load_model_parameters(experiment_directory, checkpoint, decoder):
     data = torch.load(filename)
 
     decoder.load_state_dict(data["model_state_dict"])
+    if discriminator is not None:
+        discriminator.load_state_dict(data["model_state_dict_disc"])
 
     return data["epoch"]
 

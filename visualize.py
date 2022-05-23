@@ -10,8 +10,8 @@ split_path = "./experiments/splits/nightstand.json"
 split_name_gt = "3D-FUTURE-model"
 # split_category_gt = "category_X"
 # split_categories = ['category_X', 'category_X']
-experiment_names = ['nightstand4', 'nightstand4']
-versions = ['', '2']
+experiment_names = ['nightstand5', 'nightstand5a']
+versions = [''] * len(experiment_names)
 epochs = ['1000'] * len(experiment_names)
 split_names = ['3D-FUTURE-model_manifold'] * len(experiment_names)
 num_models = 16
@@ -53,9 +53,11 @@ for model_id in model_ids:
     num_models -= 1
 
     gt_path = os.path.join(
-        '../data', split_name_gt, split_category_gt, model_id, 'normalized_model.obj')
+        # '../data', split_name_gt, split_category_gt, model_id, 'normalized_model.obj')
+        '../data', split_name_gt, "all", model_id, 'normalized_model.obj')
     gt_texture_path = os.path.join(
-        '../data', split_name_gt, split_category_gt, model_id, 'texture.png')
+        # '../data', split_name_gt, split_category_gt, model_id, 'texture.png')
+        '../data', split_name_gt, "all", model_id, 'texture.png')
 
     try:
         gt_mesh, gt_uv = get_trimesh_and_uv(

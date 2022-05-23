@@ -23,7 +23,7 @@ def create_mesh(
     scale=None,
     bbox_factor=1.0,
     level_set=0.0,
-    annealing_temperature = 0.38,
+    annealing_temperature=0.38,
 ):
     start = time.time()
     ply_filename = filename
@@ -85,7 +85,7 @@ def create_mesh(
         offset=offset,
         scale=scale,
         level_set=level_set,
-        annealing_temperature = 0.38,
+        annealing_temperature=annealing_temperature,
     )
 
 

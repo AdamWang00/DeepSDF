@@ -1,6 +1,6 @@
 DEEPSDF_CATEGORY_NAME="cabinet"
 DEEPSDF_SPLIT_NAME="cabinetM"
-DEEPSDF_EXPERIMENT_NAME="cabinet4"
+DEEPSDF_EXPERIMENT_NAME="nightstand5b"
 
 # python preprocess_data.py \
 # 	--data_dir ./data \
@@ -26,7 +26,7 @@ DEEPSDF_EXPERIMENT_NAME="cabinet4"
 # 	--ignore_surface \
 # 	--color_bins color_bins/${DEEPSDF_CATEGORY_NAME}/clusters.npz
 
-python train_deep_sdf_colorcat_coarse.py -e experiments/${DEEPSDF_EXPERIMENT_NAME}
+python train_deep_sdf_colorcat_coarse_acai.py -e experiments/${DEEPSDF_EXPERIMENT_NAME}
 python generate_training_meshes_colorcat.py -n -m 32 -c 1000 -e experiments/${DEEPSDF_EXPERIMENT_NAME}
 python evaluate_color.py -n -m 32 -c 1000 -e experiments/${DEEPSDF_EXPERIMENT_NAME} --name_surface 3D-FUTURE-model
 

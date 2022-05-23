@@ -2,7 +2,7 @@ import os
 import shutil
 import json
 
-split_path = os.path.join("experiments", "splits", "chair.json")
+split_path = os.path.join("experiments", "splits", "nightstand.json")
 split_name = "3D-FUTURE-model"
 
 from_path = "data"
@@ -13,7 +13,7 @@ subdirs = [
     "SurfaceSamples",
 ]
 
-direction_forward = True  # true = from->to, false = to->from
+direction_forward = False  # true = from->to, false = to->from
 
 with open(split_path, 'rb') as f:
     split_json = json.load(f)
